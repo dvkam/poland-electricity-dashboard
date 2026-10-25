@@ -1,85 +1,121 @@
-# Prąd Polski
+# Poland electricity dashboard
 
-A working Polish electricity dashboard: an OCaml API and a React application. Public data is fetched from PSE and Fraunhofer ISE Energy-Charts. No fabricated live data or demo fallbacks are shipped.
+Prąd Polski is a Polish-language dashboard for Poland's electricity system. It shows generation by fuel, demand, physical cross-border flows, the RCE market price and PSE's electricity-use guidance.
 
-![Desktop dashboard](docs/dashboard-desktop.png)
+The React frontend reads a local OCaml API. The API fetches public data from Energy-Charts and PSE, aligns timestamps and keeps raw JSON snapshots. No API key is required for these sources.
 
-## Stack
+![Dashboard](docs/dashboard-desktop.png)
 
-Stable versions verified on 2026-09-14 and pinned:
+## What you can do
 
-- OCaml 5.5.0, Dune, Cohttp/Lwt, Yojson, Ptime
-- React / React DOM 19.3.0
-- Vite 8.3.0
-- TypeScript 7.0.2
-- Oxlint 1.83.0 with type-aware analysis
-- Oxfmt 0.68.0
-- Node 24+ (tested with 24.19.0)
+- Inspect a day and select one quarter-hour across the charts and cards.
+- Browse dates from 14 June 2024, subject to each source's coverage.
+- Compare generation, demand, renewable share, prices and border flows.
+- See source timestamps, delayed readings and fetch errors.
+- Export the selected day as CSV.
 
-The frontend lockfile is included. OCaml's compiler constraint is exact; library constraints and the opam lockfile control the backend environment.
+Older generation data can contain hourly averages. The dashboard labels the original hour and displays its average across the four covered quarters. It does not invent measurements within that hour. Missing observations stay empty. Warsaw daylight-saving days contain 92 or 100 quarters instead of 96.
 
-## Included
+RCE is a wholesale indicator in PLN/MWh. It is not a household electricity bill. The tariff explanations distinguish fixed, time-of-use, dynamic and PV arrangements.
 
-- Live-source generation, demand, renewable production share, RCE price and physical border flows.
-- One UTC interval selection shared by the KPI cards, generation/demand chart, prices, flows and fuel breakdown.
-- Historical date selection from 2024-06-14; missing source coverage stays missing.
-- PSE Energetyczny Kompas guidance.
-- Deterministic daily summaries, explicitly scoped to available observations.
-- Fixed, time-of-use, dynamic and PV tariff explanations. No savings claims or bill simulation.
-- Source/methodology dialog, observation timestamps and source fetch timestamps.
-- CSV export with UTC boundaries and unambiguous column units.
-- Automatic five-minute refresh and backend background ingestion.
-- Persistent, versioned raw JSON responses. A failed source can fall back only to an identified prior response for the same date.
+## Repository layout
+
+```text
+src/                 React UI, runtime schemas and unit tests
+public/              Static browser assets
+backend/bin/         OCaml HTTP service and background refresh
+backend/lib/         Source requests, storage and normalization
+backend/test/        Backend regression tests
+tests/               Browser tests and local startup checks
+docs/                Screenshots and implementation reviews
+deploy/              Nginx configuration
+.github/workflows/   Frontend and backend checks
+compose.yaml         Frontend, backend and persistent data volume
+```
+
+Both applications live in this repository so a commit can update the API and its consumers together. `data/`, build output, dependencies and local logs are ignored by Git.
 
 ## Run locally
 
-### Backend (Linux, macOS, or Windows WSL)
+You need Node.js 24 or newer, npm, opam and curl. Run the backend on Linux, macOS or Windows WSL. On Debian or Ubuntu, install `build-essential`, `pkg-config`, `libgmp-dev` and `libev-dev` before installing the OCaml dependencies.
 
-Install opam and system build prerequisites. On Debian/Ubuntu, the relevant prerequisites are build-essential, curl, pkg-config, libgmp-dev and libev-dev.
-
-From the backend directory:
+Start the backend in one terminal:
 
 ```sh
+cd backend
 opam switch create . ocaml-base-compiler.5.5.0
 opam install . --deps-only --locked
 opam exec -- dune build
-opam exec -- dune runtest
 opam exec -- dune exec bin/main.exe
 ```
 
-Defaults: API on 127.0.0.1:8080, data in ../data. Optional environment settings: HOST, PORT, DATA_DIR. Create the parent of a custom DATA_DIR before starting. Run one API instance per data directory.
-
-### Frontend
-
-In the project root, with Node 24+:
+Start the frontend in another terminal, from the repository root:
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. Vite proxies /api to the OCaml service. API_TARGET can override the backend origin. First source loading may take several seconds.
+Open http://127.0.0.1:5173. Vite forwards `/api` requests to http://127.0.0.1:8080. The first load can take several seconds while the backend fetches source data.
 
-### Windows workspace shortcut
+The frontend uses React and TypeScript with Vite. The backend uses OCaml 5.5.0, Dune, Cohttp/Lwt, Yojson and Ptime. Dependency versions are recorded in `package-lock.json` and `backend/prad_polski.opam.locked`.
 
-The working project is now `C:\Users\David\Documents\ChatGPT\Dashboard electricity`.
-Run `./start-local.ps1` from PowerShell to launch the built OCaml executable in
-Ubuntu-24.04 WSL and Vite on Windows, without opening extra windows. Logs and
-process IDs stay in `.local-run/`. The script resolves paths relative to itself,
-verifies both HTTP endpoints and managed process paths, and fails if startup is
-unsuccessful or an existing service belongs to another/unmanaged checkout.
+### Configuration
 
-The launcher uses the bundled Node runtime; `NODE_BIN` can select another Node
-24+ executable. `-Distribution` selects a different WSL distribution, but the
-backend must first be built for that distribution. Run `npm ci` on Windows and
-build the backend using the instructions above for a fresh checkout. Do not
-share `node_modules` between Windows and Linux.
+| Variable     | Default                 | Used by                     |
+| ------------ | ----------------------- | --------------------------- |
+| `API_TARGET` | `http://127.0.0.1:8080` | Vite proxy                  |
+| `HOST`       | `127.0.0.1`             | Backend listener            |
+| `PORT`       | `8080`                  | Backend listener            |
+| `DATA_DIR`   | `../data`               | Backend cache and snapshots |
 
-The original recovered code is preserved in Git commit `7588c3d`. The separate
-WSL copy at `/home/david/workspace/prad-polski` was compared: its application
-source matches the recovered baseline, with differences only in launch/setup
-files. This folder is the active development copy. See
-[the review](docs/review-2026-10-25.md) and [architecture report](docs/architecture-review.html).
+Paths are relative to the backend's working directory. Create the parent directory before using a custom `DATA_DIR`. Run one backend process per data directory.
+
+### Windows shortcut
+
+After installing frontend dependencies on Windows and building the backend in WSL, run `./start-local.ps1` from PowerShell. It starts both services without opening extra windows and writes logs under `.local-run/`.
+
+The default WSL distribution is `Ubuntu-24.04`. Use `-Distribution` to select another installed distribution. Set `NODE_BIN` to a Node 24+ executable if needed. The launcher also recognizes the local Codex Node runtime. Do not share `node_modules` between Windows and Linux.
+
+### Docker
+
+```sh
+docker compose up --build
+```
+
+Open http://127.0.0.1:8088. Nginx serves the frontend and forwards API requests to OCaml. The `energy-data` volume keeps source responses across container restarts. The Docker configuration is included, but container deployment has not been verified in this workspace. See [validation notes](VALIDATION.md).
+
+## Data sources
+
+| Source                                                          | Endpoint                      | Use                                                       |
+| --------------------------------------------------------------- | ----------------------------- | --------------------------------------------------------- |
+| [Fraunhofer ISE Energy-Charts](https://api.energy-charts.info/) | `/v2/public_power?country=pl` | Generation and demand, including source interval duration |
+| [PSE reports](https://api.raporty.pse.pl/)                      | `/api/przeplywy-mocy`         | Physical flows across Poland's six reported borders       |
+| [PSE reports](https://api.raporty.pse.pl/)                      | `/api/rce-pln`                | RCE in PLN/MWh                                            |
+| [PSE reports](https://api.raporty.pse.pl/)                      | `/api/pdgsz`                  | Active Energetyczny Kompas guidance                       |
+
+Energy-Charts provides public net production based on ENTSO-E data. Generation totals exclude load, trade and storage consumption. Storage discharge is included in total generation and excluded from renewable generation. The historical source inventory can omit offshore wind and batteries; explicit null readings remain unknown.
+
+PSE flow values describe physical exchange. The backend combines both directions for each border. The national net requires complete coverage of all six borders. These flows do not identify the origin of electricity consumed in a home.
+
+Energy-Charts timestamps identify interval starts. PSE price and flow timestamps identify interval ends. The backend preserves UTC boundaries and the UI displays Warsaw time. PSE guidance is hourly and uses only active publications.
+
+## History and snapshots
+
+Historical data is requested from the upstream APIs on demand. A database is not required to browse it. Today and yesterday refresh after five minutes; older dates use a six-hour cache. Background ingestion refreshes today.
+
+Each successful fetch writes a raw JSON snapshot with its retrieval time, then replaces the current cache file. Unique snapshot names preserve successive revisions, even when fetched within the same second. Existing snapshots from the older source integration remain on disk. The v2 generation cache has a separate filename so it cannot reuse an incompatible v1 response.
+
+Mount or back up `DATA_DIR` to retain snapshots. The application has no automatic retention policy or complete historical backfill. Upstream historical responses can change after corrections, so keep snapshots when you need to reproduce what was published at an earlier time.
+
+The public dashboard API retains a quarter-hour grid. `generationStart` and `generationEnd` identify the source interval for generation, demand and the generation mix. Hourly averages repeat across their covered quarters. CSV exports include these boundaries. Duration-weighted summaries count the covered time once.
+
+## Local API
+
+- `GET /api/health` reports service status and the OCaml runtime version.
+- `GET /api/v1/day?date=YYYY-MM-DD` returns the date, timezone, source status and quarter-hour points.
+
+Measurements are nullable. A successful HTTP response does not mean every upstream source is available or current. Source failures can use an identified cached response for the same date. Invalid dates return 400 and unsupported methods return 405.
 
 ## Checks
 
@@ -89,77 +125,24 @@ cd backend
 opam exec -- dune runtest
 ```
 
-npm run check runs TypeScript, type-aware Oxlint, Oxfmt verification, Vitest and the production frontend build. Browser tests require both servers to be running:
+The frontend check runs TypeScript, linting, formatting, unit tests and the production build. With both servers running, execute browser tests from the repository root:
 
 ```sh
 npm run test:e2e
 ```
 
-The default browser is installed Microsoft Edge on Windows; set PLAYWRIGHT_CHANNEL=chromium and install Chromium with npx playwright install chromium on Linux. The live integration tests depend on public upstream services. Semantic unit tests do not.
+Browser tests use installed Microsoft Edge by default. On Linux, install Chromium with `npx playwright install chromium` and set `PLAYWRIGHT_CHANNEL=chromium`. Most tests use fixtures; the live integration test needs upstream services.
 
-TypeScript enables strict mode, checked indexed access, exact optional properties, no implicit overrides, no switch fallthrough, unused checks, explicit module syntax and side-effect import checking. The JSX prefer-tag-over-role lint rule is disabled because interactive inline SVG charts correctly use role=img; a raster img element cannot replace them.
+## Current limits
 
-## Container deployment
+- Source coverage and publication delays vary. Historical PSE coverage is separate from Energy-Charts coverage.
+- The file store supports one service process. It has no cross-process locking or automatic retention.
+- Bulk backfills need request throttling and HTTP 429 retry handling before production use.
+- There is no carbon-intensity model, forecast, tariff optimizer, account system or device control.
+- Public deployment needs a host for the OCaml process, HTTPS and persistent storage.
 
-With Docker Engine running:
+## Attribution
 
-```sh
-docker compose up --build
-```
+Data comes from [Polskie Sieci Elektroenergetyczne](https://www.pse.pl/dane-systemowe), [Fraunhofer ISE Energy-Charts](https://www.energy-charts.info/) and underlying [ENTSO-E Transparency Platform](https://transparency.entsoe.eu/) records. Energy-Charts v2 responses state CC BY 4.0 attribution to energy-charts.info. Check the applicable source terms before redistributing data.
 
-Then open http://127.0.0.1:8088. Nginx serves the Vite production build and proxies /api to the native OCaml process. The named energy-data volume persists source responses. The API is not directly published.
-
-Container configuration is supplied separately from the verified local WSL build; see VALIDATION.md for what was actually executed. Public hosting requires a container host or VM, TLS and review of upstream redistribution terms. A native OCaml API cannot run directly in the Sites Cloudflare Worker runtime.
-
-## API
-
-GET /api/health reports service status and the actual OCaml runtime version.
-
-GET /api/v1/day?date=YYYY-MM-DD returns:
-
-- schemaVersion, date, timezone and generatedAt;
-- sources with names, public URLs, exact endpoints, last successful retrieval and error state;
-- 92, 96 or 100 UTC quarter-hour slots with nullable measurements.
-
-Unsupported methods return 405. Invalid/out-of-range dates return 400. Source failures are represented per-source, with null fields where no cached data exists. A healthy HTTP response is not a claim that upstream measurements are fresh.
-
-## Source semantics
-
-Generation: https://api.energy-charts.info/public_power?country=pl
-
-Detailed reported production and load, based on ENTSO-E. Imports, pumping consumption, residual load and percentage series are excluded from generation totals. Pumped-storage discharge is displayed separately and excluded from the renewable numerator. Gas includes coal-derived gas; other includes oil, other generation and other renewables. Unknown or missing required fuel data is not replaced with zero.
-
-Physical flows: https://api.raporty.pse.pl/api/przeplywy-mocy
-
-PSE returns both XX-PL (incoming positive) and PL-XX (outgoing negative). Both rows are required for each country's net result; e.g. simultaneous Czech inflow and outflow can occur on different lines. The map displays net physical flow per border. The national net is available only if all six borders have complete data. This is not commercial exchange or the origin of imported generation.
-
-Price: https://api.raporty.pse.pl/api/rce-pln
-
-RCE in PLN/MWh, not a household price and not a substitute for a supplier's contract-specific fixing. No currency conversion, retail taxes or charges are silently added.
-
-Guidance: https://api.raporty.pse.pl/api/pdgsz
-
-Only active records are used. Values 0–3 retain PSE's own meaning. Guidance is an hourly forecast, separate from market prices.
-
-PSE price/flow dtime_utc marks the end of the quarter-hour. Energy-Charts timestamps and PSE guidance mark interval starts. Pagination uses a verified page size of 500 and follows nextLink with an origin allowlist and a bounded number of pages. The full pagination sequence must succeed before the cache is replaced.
-
-## Deliberate MVP limits
-
-- File-based raw archive, not PostgreSQL. Suitable for one service instance; no shared multi-instance locking.
-- Historical data is fetched on demand. Today and yesterday have a five-minute cache TTL so late publications can arrive after midnight; older dates use six hours. Background ingestion refreshes today. No claim of complete long-term backfill.
-- Cache revisions are retained without automatic deletion; operators should budget storage and configure archival retention for production.
-- No direct ENTSO-E token integration, carbon-intensity estimate, causal explanation, forecasting model, tariff optimiser, accounts, notifications or device control.
-- The data panel exposes provenance and timestamps, not a numerical confidence score.
-- The UI never labels a wholesale dip as guaranteed household savings.
-- Google Fonts is requested for typography; system fonts remain usable offline.
-- Data availability and redistribution rights are separate. Source attribution is included; production reuse terms still need review.
-
-## Data attribution
-
-Polskie Sieci Elektroenergetyczne: https://www.pse.pl/dane-systemowe
-
-Fraunhofer ISE Energy-Charts: https://www.energy-charts.info/
-
-Underlying European generation data: https://transparency.entsoe.eu/
-
-This is an independent project and is not endorsed by these organisations.
+This is an independent project. These organizations do not endorse it.

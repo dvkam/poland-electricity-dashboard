@@ -1,5 +1,20 @@
 # Validation — 25 October 2026
 
+## Hourly history and publication preparation
+
+- Energy-Charts v2 supplies explicit 15-minute or 60-minute duration. The backend
+  preserves source boundaries and never infers duration from timestamp gaps.
+- A live request for 14 June 2024 returned 24 hourly averages covering all 96
+  dashboard quarters. The first four share the source interval 22:00 to 23:00 UTC
+  on 13 June, with generation of 15699.4 MW.
+- Backend regressions pass for hourly coverage, missing hours, quarter-hour gaps,
+  unsupported duration, both DST transitions and same-time snapshot revisions.
+- `npm run check` passes, including 12 unit tests and the production build.
+- All 14 browser tests pass, including hourly source labels and mobile layout.
+- A scan of all existing commits found no common GitHub token, OpenAI key or
+  private-key patterns. Raw data, local logs and dependencies are ignored.
+- The public README describes setup, repository layout, APIs, storage and limits.
+
 ## Relocation and review iteration
 
 The active project is `C:\Users\David\Documents\ChatGPT\Dashboard electricity`.

@@ -1,5 +1,11 @@
 # Generation availability investigation
 
+Follow-up: hourly support is now implemented using Energy-Charts v2's explicit
+`interval_minutes`. Generation source boundaries survive quarter-hour alignment
+in the API, UI labels and CSV. The hourly limitation described below records the
+state at the time of this investigation. It has been resolved. Snapshots now use
+exclusive unique filenames to preserve revisions fetched within the same second.
+
 ## Evidence and diagnosis
 
 On 25 October 2026, the earlier generic generation error had disappeared without
