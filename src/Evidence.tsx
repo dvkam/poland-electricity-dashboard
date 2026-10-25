@@ -118,7 +118,7 @@ export function Evidence({
           <p>
             <b>OZE.</b> Sumujemy wiatr, słońce, naturalną hydroenergetykę, biomasę i inne
             raportowane odnawialne źródła. Dzielimy przez sumę raportowanej produkcji. Produkcja
-            elektrowni szczytowo-pompowych nie jest automatycznie odnawialna.
+            elektrowni szczytowo-pompowych i baterii nie jest automatycznie odnawialna.
           </p>
           <p>
             <b>Granice.</b> Saldo to suma sześciu fizycznych przekrojów PSE dla tego samego

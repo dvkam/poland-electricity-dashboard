@@ -134,7 +134,7 @@ function Mix({ point }: { point: Point | undefined }) {
         })}
       </div>
       <p className="chart-footnote">
-        Magazyny wodne: produkcja elektrowni szczytowo-pompowych. Pobór na pompowanie:{" "}
+        Magazyny: produkcja elektrowni szczytowo-pompowych i baterii. Pobór na pompowanie:{" "}
         {numberLabel(point?.pumpingMw ?? null, 0)} MW.
       </p>
     </section>
@@ -432,8 +432,8 @@ export function App() {
         )}
         {sourceIssues && sourceIssues.length > 0 && (
           <div className="warning-banner" role="status">
-            {sourceIssues.length} z 4 źródeł nie dostarczyło nowych danych. Brakujące pomiary
-            pozostają puste.
+            {sourceIssues.length} z 4 źródeł zgłasza problem pobierania lub zapisu. Brakujące
+            pomiary pozostają puste.
             <button type="button" onClick={() => evidence()}>
               Sprawdź źródła <ArrowUpRight size={14} />
             </button>

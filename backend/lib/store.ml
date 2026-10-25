@@ -7,14 +7,43 @@ let locks : (string, Lwt_mutex.t) Hashtbl.t = Hashtbl.create 32
 let lock key = match Hashtbl.find_opt locks key with Some lock -> lock | None ->
   let lock = Lwt_mutex.create () in Hashtbl.add locks key lock; lock
 
+exception Source_error of string
+
+let decode_response status body =
+  if status < 200 || status >= 300 then
+    raise (Source_error (Printf.sprintf "Źródło zwróciło HTTP %d." status));
+  try Yojson.Safe.from_string body with _ ->
+    raise (Source_error "Źródło zwróciło nieprawidłowy JSON.")
+
+let validate id payload =
+  let key = if id = "generation" then "unix_seconds" else "value" in
+  match Normalize.field key payload with
+  | `List [] -> raise (Source_error "Źródło nie opublikowało jeszcze danych dla tego dnia.")
+  | `List _ when id <> "generation" -> ()
+  | `List _ -> (match Normalize.field "production_types" payload with
+      | `List (_ :: _) -> ()
+      | _ -> raise (Source_error "Odpowiedź źródła nie zawiera serii produkcji."))
+  | _ -> raise (Source_error "Odpowiedź źródła ma niezgodny format.")
+
+let persist persist_fn payload fetched_at =
+  try persist_fn payload fetched_at; None with exn ->
+    prerr_endline ("Cache write failed: " ^ Printexc.to_string exn);
+    Some "Dane pobrano, ale nie udało się zapisać lokalnej kopii."
+
 let request url =
-  let argv = [| "curl"; "--fail"; "--silent"; "--show-error"; "--location";
+  let argv = [| "curl"; "--silent"; "--show-error"; "--location";
+    "--write-out"; "\n%{http_code}";
     "--max-time"; "25"; "--connect-timeout"; "8"; "--max-filesize"; "8000000"; url |] in
   Lwt_process.with_process_full ("curl", argv) (fun process ->
-    Lwt.both (Lwt_io.read process#stdout) (Lwt_io.read process#stderr) >>= fun (body, _) ->
+    Lwt.both (Lwt_io.read process#stdout) (Lwt_io.read process#stderr) >>= fun (body, stderr) ->
     process#status >>= function
-    | Unix.WEXITED 0 -> Lwt.return (Yojson.Safe.from_string body)
-    | _ -> Lwt.fail_with "Źródło chwilowo niedostępne")
+    | Unix.WEXITED 0 ->
+        let split = String.rindex body '\n' in
+        let status = int_of_string (String.sub body (split + 1) (String.length body - split - 1)) in
+        Lwt.return (decode_response status (String.sub body 0 split))
+    | _ ->
+        prerr_endline ("Source transport failed: " ^ url ^ " " ^ stderr);
+        Lwt.fail (Source_error "Nie udało się połączyć ze źródłem (sieć lub limit czasu)."))
 
 let rec paginated ?(remaining=20) url =
   request url >>= fun payload ->
@@ -63,17 +92,17 @@ let get ~date ~id ~url =
     | _ ->
         Lwt.catch
           (fun () -> paginated url >|= fun payload ->
-            let is_valid = if id = "generation"
-              then List.length (Normalize.list (Normalize.field "unix_seconds" payload)) > 0
-              else List.length (Normalize.list (Normalize.field "value" payload)) > 0 in
-            if not is_valid then failwith "Brak opublikowanych danych";
+            validate id payload;
             let fetched_at = Unix.gettimeofday () in
-            save path payload fetched_at;
-            {payload; fetched_at=Some fetched_at; cached=false; error=None; url; id})
-          (fun _ ->
+            let error = persist (save path) payload fetched_at in
+            {payload; fetched_at=Some fetched_at; cached=false; error; url; id})
+          (fun exn ->
+            prerr_endline ("Source fetch failed: " ^ url ^ " " ^ Printexc.to_string exn);
+            let reason = match exn with Source_error message -> message
+              | _ -> "Nie udało się przetworzyć odpowiedzi źródła." in
             let payload, fetched = match previous with Some (p, t) -> p, Some t | None -> `Null, None in
             Lwt.return {payload; fetched_at=fetched; cached=Option.is_some fetched;
-              error=Some "Źródło nie odpowiedziało lub nie opublikowało danych. Pokazujemy ostatni dostępny zapis, jeśli istnieje.";
+              error=Some (reason ^ (if Option.is_some fetched then " Pokazujemy ostatni dostępny zapis." else ""));
               url; id}))
 
 let source_json resource =

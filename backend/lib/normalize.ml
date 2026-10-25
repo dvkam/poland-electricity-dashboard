@@ -39,7 +39,12 @@ let power_index power =
           | Some values when index < Array.length values -> number values.(index)
           | _ -> None
         in
-        let mix = List.map (fun (key, names) -> key, sum (List.map get names)) groups in
+        (* Battery was added by the provider later. Absence in older payloads
+           means no reported series; an explicitly null value stays unknown. *)
+        let mix = List.map (fun (key, names) ->
+          let names = if key = "storage" && List.mem_assoc "Battery" types
+            then "Battery" :: names else names in
+          key, sum (List.map get names)) groups in
         let total = sum (List.map snd mix) in
         let renewable = sum (List.map get ["Solar"; "Wind onshore"; "Wind offshore";
           "Hydro Run-of-River"; "Hydro water reservoir"; "Biomass"; "Other renewables"]) in

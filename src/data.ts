@@ -10,7 +10,7 @@ export const fuels = [
   { key: "solar", label: "Słońce", short: "Słońce", color: "#efbb48" },
   { key: "hydro", label: "Woda", short: "Woda", color: "#559aca" },
   { key: "biomass", label: "Biomasa", short: "Biomasa", color: "#8baf6d" },
-  { key: "storage", label: "Magazyny wodne", short: "Magazyny", color: "#9c87bc" },
+  { key: "storage", label: "Magazyny energii", short: "Magazyny", color: "#9c87bc" },
   { key: "other", label: "Pozostałe", short: "Inne", color: "#c4cbd3" },
 ] as const;
 export type Fuel = (typeof fuels)[number]["key"];

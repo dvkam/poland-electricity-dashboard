@@ -93,3 +93,26 @@ let () =
     ~flows:empty ~prices:empty ~guidance:(guidance value) |> List.hd |> get "guidance" in
   check "fractional guidance is not silently converted to an official category" (normalized 1.5 = `Null);
   check "integral floating-point guidance remains valid" (normalized 2. = `Int 2)
+
+let () =
+  let fails message action =
+    check message (try action (); false with Store.Source_error _ -> true) in
+  fails "HTTP error is distinct from empty publication" (fun () -> ignore (Store.decode_response 503 "unavailable"));
+  fails "invalid JSON is rejected" (fun () -> ignore (Store.decode_response 200 "<html>"));
+  fails "empty publication is diagnosed" (fun () -> Store.validate "generation" (`Assoc ["unix_seconds", `List []]));
+  fails "missing response field is diagnosed" (fun () -> Store.validate "generation" (`Assoc []));
+  check "cache write failure returns a warning instead of discarding fresh data"
+    (Option.is_some (Store.persist (fun _ _ -> failwith "disk full") `Null 0.));
+  let series name value = `Assoc ["name", `String name; "data", `List [value]] in
+  let production = List.concat_map snd Normalize.groups |> List.map (fun name -> series name (`Float 100.)) in
+  let point battery =
+    let power = `Assoc ["unix_seconds", `List [`Int 0];
+      "production_types", `List (production @ [series "Battery" battery; series "Battery Consumption" (`Float (-300.))])] in
+    Hashtbl.find (Normalize.power_index power) 0 in
+  let mix, total, renewable, _, _ = point (`Float 500.) in
+  check "battery discharge included in storage" (List.assoc "storage" mix = Some 600.);
+  check "battery consumption excluded from generation" (total = Some 1900.);
+  check "battery discharge excluded from renewables"
+    (match renewable with Some share -> abs_float (share -. 700. /. 1900. *. 100.) < 0.001 | None -> false);
+  let _, unknown, _, _, _ = point `Null in
+  check "unknown battery output is not treated as zero" (unknown = None)
