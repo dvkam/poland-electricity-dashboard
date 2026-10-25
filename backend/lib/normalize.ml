@@ -25,6 +25,27 @@ let groups = [
   ("other", ["Others"; "Fossil oil"; "Other renewables"])
 ]
 
+(* Adapt the versioned source at the boundary. Never infer duration from gaps. *)
+let public_power_v2 payload =
+  let minutes = number (field "interval_minutes" payload) in
+  if string (field "schema_version" payload) <> Some "2.0"
+     || string (field "unit" payload) <> Some "MW"
+     || not (minutes = Some 15. || minutes = Some 60.) then
+    invalid_arg "Unsupported Energy-Charts schema, unit or interval";
+  let rows = list (field "data" payload) in
+  let times = List.map (fun row -> match timestamp "timestamp" row with
+    | Some t -> `Float t | None -> invalid_arg "Invalid generation timestamp") rows in
+  let series = list (field "series" payload) |> List.map (fun entry ->
+    let id = match string (field "id" entry) with Some id -> id | None -> invalid_arg "Missing series id" in
+    let name = match string (field "name" entry) with Some name -> name | None -> invalid_arg "Missing series name" in
+    `Assoc ["name", `String name; "data", `List (List.map (fun row -> field id (field "values" row)) rows)]) in
+  (* Offshore wind did not appear in the historical Polish source inventory. *)
+  let series = if List.exists (fun s -> string (field "name" s) = Some "Wind offshore") series
+    then series else series @ [`Assoc ["name", `String "Wind offshore";
+      "data", `List (List.map (fun _ -> `Float 0.) rows)]] in
+  `Assoc ["unix_seconds", `List times; "production_types", `List series;
+    "interval_minutes", json_number minutes]
+
 let power_index power =
   let times = Array.of_list (list (field "unix_seconds" power)) in
   let types = list (field "production_types" power) |> List.filter_map (fun entry ->
@@ -82,15 +103,23 @@ let flow_json country row =
 
 let day ~date ~power ~flows ~prices ~guidance =
   let indexed = power_index power in
+  let duration = match number (field "interval_minutes" power) with
+    | Some 60. -> 3600. | _ -> 900. in
+  let covered = Hashtbl.create 100 in
+  Hashtbl.iter (fun timestamp value ->
+    let start = float_of_int timestamp in
+    for quarter = 0 to int_of_float (duration /. 900.) - 1 do
+      Hashtbl.replace covered (timestamp + quarter * 900) (value, start, start +. duration)
+    done) indexed;
   let flow_rows = list (field "value" flows)
   and price_rows = list (field "value" prices)
   and guidance_rows = list (field "value" guidance) in
   Time.slots date |> List.map (fun start ->
     let finish = start +. 900. in
-    let mix, total, renewable, demand, pumping =
-      match Hashtbl.find_opt indexed (int_of_float start) with
-      | Some point -> point
-      | None -> List.map (fun (key, _) -> key, None) groups, None, None, None, None in
+    let (mix, total, renewable, demand, pumping), generation_start, generation_end =
+      match Hashtbl.find_opt covered (int_of_float start) with
+      | Some (point, first, last) -> point, Some first, Some last
+      | None -> (List.map (fun (key, _) -> key, None) groups, None, None, None, None), None, None in
     let border_flows = List.map (fun country ->
       let matching section = latest_row flow_rows (fun row ->
         string (field "section_code" row) = Some section
@@ -116,6 +145,7 @@ let day ~date ~power ~flows ~prices ~guidance =
       match timestamp "dtime_utc" row with Some value -> value <= start && value +. 3600. > start | None -> false) in
     `Assoc [
       "start", `String (Time.iso start); "end", `String (Time.iso finish);
+      "generationStart", json_time generation_start; "generationEnd", json_time generation_end;
       "generation", `Assoc (List.map (fun (key, value) -> key, json_number value) mix);
       "generationMw", json_number total; "demandMw", json_number demand;
       "renewablePercent", json_number renewable;

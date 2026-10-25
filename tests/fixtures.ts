@@ -9,6 +9,8 @@ export function fixtureDay(date = "2026-10-25"): Day {
   const points = Array.from({ length }, (_, index): Point => ({
     start: new Date(start + index * 900_000).toISOString(),
     end: new Date(start + (index + 1) * 900_000).toISOString(),
+    generationStart: new Date(start + index * 900_000).toISOString(),
+    generationEnd: new Date(start + (index + 1) * 900_000).toISOString(),
     generation: {
       coal: 8000,
       lignite: 4000,

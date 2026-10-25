@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChartNoAxesCombined } from "lucide-react";
 import { useChartWidth } from "./useChartWidth";
-import { fuels, intervalLabel, numberLabel, timeLabel } from "./data";
+import { fuels, generationIntervalLabel, numberLabel, timeLabel } from "./data";
 import type { Day } from "./data";
 
 type Props = { day: Day; selected: number; onSelect: (index: number) => void };
@@ -30,8 +30,10 @@ export function Timeline({ day, selected, onSelect }: Props) {
     if (point.demandMw === null) {
       if (current) demandSegments.push(current);
       current = "";
-    } else
-      current += (current ? " L" : "M") + (left + (index + 0.5) * step) + "," + y(point.demandMw);
+    } else {
+      current += (current ? " L" : "M") + (left + index * step) + "," + y(point.demandMw);
+      current += " L" + (left + (index + 1) * step) + "," + y(point.demandMw);
+    }
   });
   if (current) demandSegments.push(current);
   return (
@@ -52,7 +54,7 @@ export function Timeline({ day, selected, onSelect }: Props) {
             Zapotrzebowanie
           </button>
         </div>
-        <span className="interval-label">{chosen ? intervalLabel(chosen) : "—"}</span>
+        <span className="interval-label">{chosen ? generationIntervalLabel(chosen) : "—"}</span>
       </div>
       <div className="chart-container" ref={ref}>
         <svg
@@ -183,8 +185,8 @@ export function Timeline({ day, selected, onSelect }: Props) {
         </span>
       </div>
       <div className="chart-footnote">
-        Przesuń po wykresie lub użyj suwaka. Wszystkie odczyty dotyczą wybranego kwadransa.
-        Kreskowanie oznacza brak danych.
+        Wybierz kwadrans suwakiem. Historyczne średnie godzinowe produkcji i popytu obejmują cztery
+        kwadranse, nie są osobnymi pomiarami. Kreskowanie oznacza brak danych.
       </div>
     </section>
   );

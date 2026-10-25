@@ -26,6 +26,7 @@ import {
   dateLabel,
   fullTime,
   intervalLabel,
+  generationIntervalLabel,
   fuels,
   latestIndex,
   numberLabel,
@@ -42,6 +43,8 @@ function downloadCsv(day: Day) {
   const headings = [
     "start_utc",
     "end_utc",
+    "generation_start_utc",
+    "generation_end_utc",
     "generation_mw",
     "demand_mw",
     "renewable_percent",
@@ -49,7 +52,17 @@ function downloadCsv(day: Day) {
     "rce_pln_mwh",
   ];
   const rows = day.points.map((p) =>
-    [p.start, p.end, p.generationMw, p.demandMw, p.renewablePercent, p.netImportMw, p.rcePlnMwh]
+    [
+      p.start,
+      p.end,
+      p.generationStart,
+      p.generationEnd,
+      p.generationMw,
+      p.demandMw,
+      p.renewablePercent,
+      p.netImportMw,
+      p.rcePlnMwh,
+    ]
       .map((value) => value ?? "")
       .join(","),
   );
@@ -411,7 +424,7 @@ export function App() {
             <span>{loading && !data ? "Pobieranie danych ze źródeł" : status}</span>
             {latestPoint && (
               <span className="muted" title={fullTime(latestPoint.end)}>
-                · {intervalLabel(latestPoint)}
+                · {generationIntervalLabel(latestPoint)}
               </span>
             )}
           </div>

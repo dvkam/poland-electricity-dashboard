@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { ArrowUpRight, Database, X } from "lucide-react";
-import { fullTime, intervalLabel } from "./data";
+import { fullTime, intervalLabel, generationIntervalLabel } from "./data";
 import type { Day, Point, SourceId } from "./data";
 export function Evidence({
   open,
@@ -53,6 +53,7 @@ export function Evidence({
         {point && (
           <p className="observation-context">
             <b>Wybrany przedział: {intervalLabel(point)}</b>
+            <span>Produkcja i popyt: {generationIntervalLabel(point)}</span>
             <span>
               {fullTime(point.start)} → {fullTime(point.end)}
             </span>

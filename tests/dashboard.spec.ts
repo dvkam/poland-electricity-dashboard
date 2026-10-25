@@ -17,7 +17,9 @@ test("shared selection, tariffs, source dialog and CSV work on a 25-hour day", a
   const slider = page.getByRole("slider", { name: "Wybierz kwadrans" });
   await slider.fill("52");
   await expect(page.locator(".snapshot-heading")).toContainText("12:00–12:15");
-  await expect(page.locator(".interval-label")).toHaveText("12:00–12:15 (UTC+1)");
+  await expect(page.locator(".interval-label")).toHaveText(
+    "Średnia 15-minutowa · 12:00–12:15 (UTC+1)",
+  );
   await page.getByRole("button", { name: "Stała · G11", exact: true }).click();
   await expect(page.locator(".tariff-explanation")).toContainText("zwykle nie obniża kosztu");
   await page.getByRole("button", { name: "Dynamiczna", exact: true }).click();
@@ -74,7 +76,7 @@ for (const scenario of [
     const slider = page.getByRole("slider", { name: "Wybierz kwadrans" });
     await expect(slider).toHaveAttribute("max", String(scenario.count - 1));
     await slider.fill(String(scenario.noon));
-    await expect(page.locator(".interval-label")).toHaveText(`12:00–12:15 (${scenario.offset})`);
+    await expect(page.locator(".interval-label")).toContainText(`12:00–12:15 (${scenario.offset})`);
     await expect(page.locator(".snapshot-heading")).toContainText(
       `12:00–12:15 (${scenario.offset})`,
     );
@@ -85,9 +87,9 @@ test("repeated hours have distinct visible offsets", async ({ page }) => {
   await page.goto("/");
   const slider = page.getByRole("slider", { name: "Wybierz kwadrans" });
   await slider.fill("9");
-  await expect(page.locator(".interval-label")).toHaveText("02:15–02:30 (UTC+2)");
+  await expect(page.locator(".interval-label")).toContainText("02:15–02:30 (UTC+2)");
   await slider.fill("13");
-  await expect(page.locator(".interval-label")).toHaveText("02:15–02:30 (UTC+1)");
+  await expect(page.locator(".interval-label")).toContainText("02:15–02:30 (UTC+1)");
 });
 
 test("today follows midnight while a selected historical day stays put", async ({ page }) => {
@@ -122,4 +124,26 @@ test("mobile design remains readable at narrow widths", async ({ page }) => {
     ).toBeTruthy();
     await expect(page.locator(".snapshot-date")).toBeVisible();
   }
+});
+
+test("hourly generation keeps its original interval when selecting a quarter", async ({ page }) => {
+  await page.route("**/api/v1/day?*", (route) => {
+    const day = fixtureDay();
+    day.points = day.points.map((point, index) => {
+      const first = day.points[Math.floor(index / 4) * 4];
+      const last = day.points[Math.floor(index / 4) * 4 + 3];
+      return { ...point, generationStart: first?.start ?? null, generationEnd: last?.end ?? null };
+    });
+    return route.fulfill({ json: day });
+  });
+  await page.goto("/");
+  await page.getByRole("slider", { name: "Wybierz kwadrans" }).fill("53");
+  await expect(page.locator(".snapshot-heading")).toContainText("12:15–12:30");
+  await expect(page.locator(".interval-label")).toHaveText(
+    "Średnia godzinowa · 12:00–13:00 (UTC+1)",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+  ).toBeTruthy();
 });

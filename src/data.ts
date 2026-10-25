@@ -27,6 +27,8 @@ export const sourceSchema = z.object({
 export const pointSchema = z.object({
   start: timestamp,
   end: timestamp,
+  generationStart: timestamp.nullable(),
+  generationEnd: timestamp.nullable(),
   generation: z.object({
     coal: nullableNumber,
     lignite: nullableNumber,
@@ -103,6 +105,11 @@ export function intervalLabel(point: Pick<Point, "start" | "end">): string {
     ? `${timeLabel(point.start)}–${timeLabel(point.end)} (${startOffset})`
     : `${timeLabel(point.start)} ${startOffset}–${timeLabel(point.end)} ${endOffset}`;
 }
+export function generationIntervalLabel(point: Point): string {
+  if (!point.generationStart || !point.generationEnd) return "Brak pomiaru";
+  const minutes = (Date.parse(point.generationEnd) - Date.parse(point.generationStart)) / 60_000;
+  return `${minutes === 60 ? "Średnia godzinowa" : "Średnia 15-minutowa"} · ${intervalLabel({ start: point.generationStart, end: point.generationEnd })}`;
+}
 export const numberLabel = (value: number | null, digits = 1) =>
   value === null
     ? "—"
@@ -133,15 +140,17 @@ export const dateLabel = (date: string) =>
 export function latestIndex(points: readonly Point[], now = Date.now()): number | null {
   let index: number | null = null;
   points.forEach((point, i) => {
-    if (point.generationMw !== null && Date.parse(point.end) <= now) index = i;
+    if (point.generationMw !== null && Date.parse(point.generationEnd ?? point.end) <= now)
+      index = i;
   });
   return index;
 }
 
 export function observationState(point: Point | undefined, date: string, now = Date.now()): string {
-  if (!point || point.generationMw === null || Date.parse(point.end) > now) return "Brak pomiaru";
+  if (!point || point.generationMw === null || Date.parse(point.generationEnd ?? point.end) > now)
+    return "Brak pomiaru";
   if (date !== today(now)) return "Dane historyczne";
-  const age = now - Date.parse(point.end);
+  const age = now - Date.parse(point.generationEnd ?? point.end);
   if (age > 3_600_000) return "Dane opóźnione";
   return "Ostatni pomiar";
 }

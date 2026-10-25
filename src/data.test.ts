@@ -11,6 +11,8 @@ import {
 const empty = pointSchema.parse({
   start: "2026-09-13T22:00:00Z",
   end: "2026-09-13T22:15:00Z",
+  generationStart: null,
+  generationEnd: null,
   generation: {
     coal: null,
     lignite: null,

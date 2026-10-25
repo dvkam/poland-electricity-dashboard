@@ -116,3 +116,39 @@ let () =
     (match renewable with Some share -> abs_float (share -. 700. /. 1900. *. 100.) < 0.001 | None -> false);
   let _, unknown, _, _, _ = point `Null in
   check "unknown battery output is not treated as zero" (unknown = None)
+
+let () =
+  let start = Option.get (Time.bounds "2024-06-14") |> fst in
+  let source minutes timestamps = `Assoc [
+    "schema_version", `String "2.0"; "unit", `String "MW"; "interval_minutes", `Int minutes;
+    "series", `List (List.concat_map snd Normalize.groups |> List.filter (fun name -> name <> "Wind offshore")
+      |> List.map (fun name -> `Assoc ["id", `String name; "name", `String name]));
+    "data", `List (List.map (fun t -> `Assoc ["timestamp", `String (Time.iso t);
+      "values", `Assoc (List.concat_map snd Normalize.groups |> List.map (fun name -> name, `Float 100.))]) timestamps)] in
+  let normalize minutes times = Normalize.day ~date:"2024-06-14"
+    ~power:(Normalize.public_power_v2 (source minutes times)) ~flows:empty ~prices:empty ~guidance:empty in
+  let hourly = normalize 60 [start; start +. 7200.] in
+  check "hourly averages cover exactly four quarters" (List.init 4 (fun i -> get "generationMw" (List.nth hourly i)) = List.init 4 (fun _ -> `Float 1300.));
+  check "missing source hour stays missing" (get "generationMw" (List.nth hourly 4) = `Null);
+  check "source hour boundaries survive quarter alignment"
+    (get "generationStart" (List.nth hourly 3) = `String (Time.iso start)
+     && get "generationEnd" (List.nth hourly 3) = `String (Time.iso (start +. 3600.)));
+  let quarter = normalize 15 [start; start +. 3600.] in
+  check "gaps do not turn quarter-hour readings into hourly averages" (get "generationMw" (List.nth quarter 1) = `Null);
+  check "unsupported source duration is rejected" (try ignore (Normalize.public_power_v2 (source 30 [start])); false with Invalid_argument _ -> true);
+  List.iter (fun date ->
+    let times = Time.slots date |> List.filteri (fun i _ -> i mod 4 = 0) in
+    let power = Normalize.public_power_v2 (source 60 times) in
+    let points = Normalize.day ~date ~power ~flows:empty ~prices:empty ~guidance:empty in
+    check ("hourly source covers DST day " ^ date)
+      (List.for_all (fun p -> get "generationMw" p = `Float 1300.) points)
+  ) ["2026-03-29"; "2026-10-25"];
+  let dir = Filename.temp_file "grid-snapshot-test" "" in
+  Sys.remove dir; Unix.mkdir dir 0o700;
+  Fun.protect ~finally:(fun () -> Array.iter (fun f -> Sys.remove (Filename.concat dir f)) (Sys.readdir dir); Unix.rmdir dir)
+    (fun () ->
+      let path = Filename.concat dir "generation.json" in
+      Store.save path (`Int 1) 123.; Store.save path (`Int 2) 123.;
+      let archived = Sys.readdir dir |> Array.to_list |> List.filter (fun f -> f <> "generation.json") in
+      check "same-time revisions keep both immutable snapshots" (List.length archived = 2);
+      check "cache points to latest revision" (Store.read path = Some (`Int 2, 123.)))

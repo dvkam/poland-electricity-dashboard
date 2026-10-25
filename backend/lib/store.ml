@@ -16,6 +16,10 @@ let decode_response status body =
     raise (Source_error "Źródło zwróciło nieprawidłowy JSON.")
 
 let validate id payload =
+  let payload = if id = "generation" then
+    (try Normalize.public_power_v2 payload with Invalid_argument _ ->
+      raise (Source_error "Nieobsługiwany format, jednostka lub okres danych produkcji."))
+    else payload in
   let key = if id = "generation" then "unix_seconds" else "value" in
   match Normalize.field key payload with
   | `List [] -> raise (Source_error "Źródło nie opublikowało jeszcze danych dla tego dnia.")
@@ -64,11 +68,15 @@ let read path =
 
 let save path payload fetched =
   let envelope = `Assoc ["fetchedAt", `Float fetched; "payload", payload] in
+  (* Exclusive unique names preserve revisions even within the same second.
+     Archive first so a successful cache replacement always has a snapshot. *)
+  let _, channel = Filename.open_temp_file ~temp_dir:(Filename.dirname path)
+    (Filename.basename path ^ "." ^ Printf.sprintf "%.6f" fetched ^ "-") ".json" in
+  Fun.protect ~finally:(fun () -> close_out_noerr channel)
+    (fun () -> Yojson.Safe.to_channel channel envelope; flush channel);
   let temporary = path ^ ".tmp" in
   Yojson.Safe.to_file temporary envelope;
-  Unix.rename temporary path;
-  let archive = path ^ "." ^ string_of_int (int_of_float fetched) ^ ".json" in
-  Yojson.Safe.to_file archive envelope
+  Unix.rename temporary path
 
 (* Yesterday can still receive late measurements and revisions. Derive its
    calendar date from Warsaw midnight rather than subtracting a 24-hour day. *)
@@ -80,7 +88,7 @@ let cache_ttl ~date ~now =
   if date = today || date = yesterday then 300. else 21600.
 
 let get ~date ~id ~url =
-  let key = id ^ "-" ^ date in
+  let key = (if id = "generation" then "generation-v2" else id) ^ "-" ^ date in
   Lwt_mutex.with_lock (lock key) (fun () ->
     let path = Filename.concat directory (key ^ ".json") in
     let previous = read path in
@@ -132,14 +140,15 @@ let load_day date =
     ^ "?$filter=" ^ Uri.pct_encode ("business_date eq '" ^ date ^ "'" ^ extra)
     ^ "&$first=500" in
   let requests = [
-    ("generation", "https://api.energy-charts.info/public_power?country=pl&start=" ^ date ^ "&end=" ^ date);
+    ("generation", "https://api.energy-charts.info/v2/public_power?country=pl&start=" ^ date ^ "&end=" ^ date);
     ("flows", pse "przeplywy-mocy" "");
     ("prices", pse "rce-pln" "");
     ("guidance", pse "pdgsz" " and is_active eq true")
   ] in
   Lwt_list.map_p (fun (id, url) -> get ~date ~id ~url) requests >|= fun resources ->
   let payload id = match List.find_opt (fun r -> r.id = id) resources with Some r -> r.payload | None -> `Null in
-  let points = Normalize.day ~date ~power:(payload "generation") ~flows:(payload "flows")
+  let power = match payload "generation" with `Null -> `Null | p -> Normalize.public_power_v2 p in
+  let points = Normalize.day ~date ~power ~flows:(payload "flows")
     ~prices:(payload "prices") ~guidance:(payload "guidance") in
   `Assoc [
     "schemaVersion", `Int 1; "date", `String date; "timezone", `String "Europe/Warsaw";
