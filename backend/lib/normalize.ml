@@ -119,6 +119,6 @@ let day ~date ~power ~flows ~prices ~guidance =
       "rcePlnMwh", json_number (Option.bind price (fun row -> number (field "rce_pln" row)));
       "pricePublishedAt", json_time (Option.bind price (timestamp "publication_ts_utc"));
       "guidance", (match Option.bind advice (fun row -> number (field "usage_fcst" row)) with
-        | Some n when n >= 0. && n <= 3. -> `Int (int_of_float n) | _ -> `Null);
+        | Some n when n >= 0. && n <= 3. && Float.floor n = n -> `Int (int_of_float n) | _ -> `Null);
       "guidancePublishedAt", json_time (Option.bind advice (timestamp "publication_ts_utc"))
     ])

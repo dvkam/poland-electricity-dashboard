@@ -74,3 +74,22 @@ let () =
   check "storage discharge is excluded from renewable numerator" (num (get "renewablePercent" first) = Some 50.);
   check "reported load remains independent" (num (get "demandMw" first) = Some 1800.);
   check "pumping demand is displayed as a positive magnitude" (num (get "pumpingMw" first) = Some 80.)
+
+let () =
+  let at value = Option.get (Time.parse_utc value) in
+  let now = at "2026-09-14T22:03:00Z" in
+  check "today refreshes every five minutes" (Store.cache_ttl ~date:"2026-09-15" ~now = 300.);
+  check "yesterday keeps refreshing after Warsaw midnight" (Store.cache_ttl ~date:"2026-09-14" ~now = 300.);
+  check "older dates retain six-hour cache" (Store.cache_ttl ~date:"2026-09-13" ~now = 21600.);
+  check "yesterday is correct late on a 25-hour day"
+    (Store.cache_ttl ~date:"2026-10-24" ~now:(at "2026-10-25T22:30:00Z") = 300.);
+  check "yesterday is correct after a 23-hour day"
+    (Store.cache_ttl ~date:"2026-03-29" ~now:(at "2026-03-29T22:03:00Z") = 300.);
+  let guidance value = `Assoc ["value", `List [`Assoc [
+    "dtime_utc", `String "2026-09-13 22:00";
+    "publication_ts_utc", `String "2026-09-13 20:00";
+    "is_active", `Bool true; "usage_fcst", `Float value]]] in
+  let normalized value = Normalize.day ~date:"2026-09-14" ~power:`Null
+    ~flows:empty ~prices:empty ~guidance:(guidance value) |> List.hd |> get "guidance" in
+  check "fractional guidance is not silently converted to an official category" (normalized 1.5 = `Null);
+  check "integral floating-point guidance remains valid" (normalized 2. = `Int 2)

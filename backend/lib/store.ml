@@ -41,13 +41,22 @@ let save path payload fetched =
   let archive = path ^ "." ^ string_of_int (int_of_float fetched) ^ ".json" in
   Yojson.Safe.to_file archive envelope
 
+(* Yesterday can still receive late measurements and revisions. Derive its
+   calendar date from Warsaw midnight rather than subtracting a 24-hour day. *)
+let cache_ttl ~date ~now =
+  let today = Time.today now in
+  let yesterday = match Time.bounds today with
+    | Some (midnight, _) -> Time.today (midnight -. 1.)
+    | None -> assert false in
+  if date = today || date = yesterday then 300. else 21600.
+
 let get ~date ~id ~url =
   let key = id ^ "-" ^ date in
   Lwt_mutex.with_lock (lock key) (fun () ->
     let path = Filename.concat directory (key ^ ".json") in
     let previous = read path in
     let now = Unix.gettimeofday () in
-    let ttl = if date = Time.today now then 300. else 21600. in
+    let ttl = cache_ttl ~date ~now in
     match previous with
     | Some (payload, fetched) when now -. fetched < ttl ->
         Lwt.return {payload; fetched_at=Some fetched; cached=true; error=None; url; id}
