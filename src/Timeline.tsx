@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { ChartNoAxesCombined, ChevronDown } from "lucide-react";
+import { ChartNoAxesCombined } from "lucide-react";
 import { useChartWidth } from "./useChartWidth";
-import { fuels, numberLabel, timeLabel } from "./data";
+import { fuels, intervalLabel, numberLabel, timeLabel } from "./data";
 import type { Day } from "./data";
 
 type Props = { day: Day; selected: number; onSelect: (index: number) => void };
@@ -52,10 +52,7 @@ export function Timeline({ day, selected, onSelect }: Props) {
             Zapotrzebowanie
           </button>
         </div>
-        <span className="interval-label">
-          {chosen ? timeLabel(chosen.start) + "–" + timeLabel(chosen.end) : "—"}{" "}
-          <ChevronDown size={14} />
-        </span>
+        <span className="interval-label">{chosen ? intervalLabel(chosen) : "—"}</span>
       </div>
       <div className="chart-container" ref={ref}>
         <svg

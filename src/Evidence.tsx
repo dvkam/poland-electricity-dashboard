@@ -1,24 +1,29 @@
 import { useEffect, useRef } from "react";
 import { ArrowUpRight, Database, X } from "lucide-react";
-import { fullTime } from "./data";
-import type { Day, SourceId } from "./data";
+import { fullTime, intervalLabel } from "./data";
+import type { Day, Point, SourceId } from "./data";
 export function Evidence({
   open,
   focus,
   day,
+  point,
   onClose,
 }: {
   open: boolean;
   focus: SourceId | null;
   day: Day | null;
+  point: Point | undefined;
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const element = dialog.current;
-    if (open && element && !element.open) element.showModal();
-    else if (!open && element?.open) element.close();
-  }, [open]);
+    if (open && element && !element.open) {
+      element.showModal();
+      if (focus)
+        element.querySelector(`[data-source="${focus}"]`)?.scrollIntoView({ block: "nearest" });
+    } else if (!open && element?.open) element.close();
+  }, [open, focus]);
   return (
     <dialog
       className="evidence-dialog"
@@ -45,9 +50,21 @@ export function Evidence({
           Pomiary są wstępne i mogą być korygowane. Pokazujemy przedziały czasu w Polsce, zachowując
           znaczniki UTC. Dane z różnych źródeł mogą pojawiać się w różnym czasie.
         </p>
+        {point && (
+          <p className="observation-context">
+            <b>Wybrany przedział: {intervalLabel(point)}</b>
+            <span>
+              {fullTime(point.start)} → {fullTime(point.end)}
+            </span>
+            <span>
+              UTC: {point.start} → {point.end}
+            </span>
+          </p>
+        )}
         {day?.sources.map((source) => (
           <article
             key={source.id}
+            data-source={source.id}
             className={`source-card ${focus === source.id ? "source-highlight" : ""}`}
           >
             <div className="source-title">

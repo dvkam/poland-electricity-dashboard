@@ -21,9 +21,11 @@ import { FlowMap } from "./FlowMap";
 import { Timeline } from "./Timeline";
 import { PriceChart } from "./PriceChart";
 import { useDay } from "./useDay";
+import { useDashboardDay } from "./useDashboardDay";
 import {
   dateLabel,
   fullTime,
+  intervalLabel,
   fuels,
   latestIndex,
   numberLabel,
@@ -289,19 +291,25 @@ function Guidance({ point }: { point: Point | undefined }) {
   );
 }
 export function App() {
-  const [date, setDate] = useState(today);
-  const [selection, setSelection] = useState<number | null>(null);
+  const { date, now, selectDate } = useDashboardDay();
+  const [selection, setSelection] = useState<{ date: string; index: number } | null>(null);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [sourceFocus, setSourceFocus] = useState<SourceId | null>(null);
   const { data, error, loading, refresh } = useDay(date);
+  const latest = data ? latestIndex(data.points, now) : null;
   const selected = data
-    ? Math.min(selection ?? latestIndex(data.points), data.points.length - 1)
+    ? Math.min(
+        (selection?.date === date ? selection.index : null) ?? latest ?? 0,
+        data.points.length - 1,
+      )
     : 0;
   const point = data?.points[selected];
-  const latest = data?.points[latestIndex(data.points)];
+  const latestPoint = latest === null ? undefined : data?.points[latest];
+  const status = observationState(latestPoint, date, now);
+  const selectInterval = (index: number) => setSelection({ date, index });
   function changeDate(value: string) {
     if (!value || value < "2024-06-14" || value > today()) return;
-    setDate(value);
+    selectDate(value);
     setSelection(null);
   }
   function evidence(id: SourceId | null = null) {
@@ -398,14 +406,12 @@ export function App() {
         <div className="status-strip">
           <div>
             <span
-              className={`status-dot ${observationState(latest, date) === "Dane opóźnione" ? "delayed" : ""}`}
+              className={`status-dot ${status === "Dane opóźnione" ? "delayed" : status === "Brak pomiaru" ? "missing" : ""}`}
             />
-            <span>
-              {loading && !data ? "Pobieranie danych ze źródeł" : observationState(latest, date)}
-            </span>
-            {latest?.generationMw !== null && latest && (
-              <span className="muted" title={fullTime(latest.end)}>
-                · {timeLabel(latest.start)}–{timeLabel(latest.end)}
+            <span>{loading && !data ? "Pobieranie danych ze źródeł" : status}</span>
+            {latestPoint && (
+              <span className="muted" title={fullTime(latestPoint.end)}>
+                · {intervalLabel(latestPoint)}
               </span>
             )}
           </div>
@@ -447,11 +453,15 @@ export function App() {
           <>
             <div className="snapshot-heading">
               <span>
-                WYBRANY ODCZYT{" "}
-                <b>{point ? timeLabel(point.start) + "–" + timeLabel(point.end) : "—"}</b>
+                WYBRANY ODCZYT <b>{point ? intervalLabel(point) : "—"}</b>
                 <span className="snapshot-date">{dateLabel(date)}</span>
               </span>
-              <button type="button" className="text-link" onClick={() => setSelection(null)}>
+              <button
+                type="button"
+                className="text-link"
+                disabled={latest === null}
+                onClick={() => setSelection(null)}
+              >
                 Ostatni pomiar <ArrowRight size={14} />
               </button>
             </div>
@@ -501,7 +511,7 @@ export function App() {
               />
             </div>
             <div className="primary-grid">
-              <Timeline day={data} selected={selected} onSelect={setSelection} />
+              <Timeline day={data} selected={selected} onSelect={selectInterval} />
               <FlowMap point={point} onEvidence={() => evidence("flows")} />
             </div>
             <Guidance point={point} />
@@ -510,7 +520,7 @@ export function App() {
               <PriceChart
                 day={data}
                 selected={selected}
-                onSelect={setSelection}
+                onSelect={selectInterval}
                 onEvidence={() => evidence("prices")}
               />
               <TariffCard />
@@ -544,6 +554,7 @@ export function App() {
         open={evidenceOpen}
         focus={sourceFocus}
         day={data}
+        point={point}
         onClose={() => setEvidenceOpen(false)}
       />
     </>

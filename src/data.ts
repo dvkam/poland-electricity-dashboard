@@ -84,6 +84,25 @@ export const fullTime = (iso: string) =>
     dateStyle: "medium",
     timeStyle: "long",
   }).format(new Date(iso));
+const offsetFormatter = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Europe/Warsaw",
+  timeZoneName: "shortOffset",
+});
+export function timeOffset(iso: string): string {
+  return (
+    offsetFormatter
+      .formatToParts(new Date(iso))
+      .find((part) => part.type === "timeZoneName")
+      ?.value.replace("GMT", "UTC") ?? "Europe/Warsaw"
+  );
+}
+export function intervalLabel(point: Pick<Point, "start" | "end">): string {
+  const startOffset = timeOffset(point.start);
+  const endOffset = timeOffset(point.end);
+  return startOffset === endOffset
+    ? `${timeLabel(point.start)}–${timeLabel(point.end)} (${startOffset})`
+    : `${timeLabel(point.start)} ${startOffset}–${timeLabel(point.end)} ${endOffset}`;
+}
 export const numberLabel = (value: number | null, digits = 1) =>
   value === null
     ? "—"
@@ -91,13 +110,13 @@ export const numberLabel = (value: number | null, digits = 1) =>
         maximumFractionDigits: digits,
         minimumFractionDigits: digits,
       }).format(value);
-export const today = () =>
+export const today = (now = Date.now()) =>
   new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Warsaw",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(new Date());
+  }).format(new Date(now));
 export function shiftDate(date: string, days: number): string {
   const result = new Date(date + "T12:00:00Z");
   result.setUTCDate(result.getUTCDate() + days);
@@ -111,8 +130,8 @@ export const dateLabel = (date: string) =>
     timeZone: "Europe/Warsaw",
   }).format(new Date(date + "T12:00:00Z"));
 
-export function latestIndex(points: readonly Point[], now = Date.now()): number {
-  let index = 0;
+export function latestIndex(points: readonly Point[], now = Date.now()): number | null {
+  let index: number | null = null;
   points.forEach((point, i) => {
     if (point.generationMw !== null && Date.parse(point.end) <= now) index = i;
   });
@@ -120,8 +139,8 @@ export function latestIndex(points: readonly Point[], now = Date.now()): number 
 }
 
 export function observationState(point: Point | undefined, date: string, now = Date.now()): string {
-  if (!point || point.generationMw === null) return "Brak pomiaru";
-  if (date !== today()) return "Dane historyczne";
+  if (!point || point.generationMw === null || Date.parse(point.end) > now) return "Brak pomiaru";
+  if (date !== today(now)) return "Dane historyczne";
   const age = now - Date.parse(point.end);
   if (age > 3_600_000) return "Dane opóźnione";
   return "Ostatni pomiar";
@@ -141,7 +160,7 @@ export function renewableEnergyShare(points: readonly Point[]): number | null {
 
 export const tariffCopy = {
   G11: {
-    title: "Cena na giełdzie spada. Twój rachunek nie zmienia się z godziny na godzinę.",
+    title: "Nawet gdy cena na giełdzie spada, Twoja stawka nie zmienia się z godziny na godzinę.",
     text: "Przy stałej, jednostrefowej cenie energii przesunięcie tego samego zużycia na inną porę zwykle nie obniża kosztu. RCE nie jest ceną Twojej umowy.",
     note: "Najpierw sprawdź cenę energii i opłaty na swojej fakturze.",
   },

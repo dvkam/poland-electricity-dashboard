@@ -303,6 +303,33 @@ h1 {
 .status-dot.delayed {
   background: #c69848;
 }
+.status-dot.missing {
+  background: #718092;
+}
+.observation-context {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px solid #dce2e8;
+  border-radius: 8px;
+  background: white;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.source-card {
+  scroll-margin-top: 110px;
+}
+@media (hover: hover) and (pointer: fine) {
+  button:active:not(:disabled):not(:focus-visible) {
+    transform: scale(0.98);
+  }
+}
+button:focus-visible,
+a:focus-visible {
+  transition: none;
+}
 .refresh-button {
   display: flex;
   gap: 7px;
@@ -1343,6 +1370,7 @@ h2 {
   }
   .date-controls {
     flex-direction: row;
+    flex-wrap: wrap;
     margin-top: 20px;
     justify-content: space-between;
     align-items: center;
@@ -1383,7 +1411,9 @@ h2 {
     margin: 0;
   }
   .snapshot-date {
-    display: none;
+    display: block;
+    flex-basis: 100%;
+    margin: 0;
   }
   .snapshot-heading > .text-link {
     font-size: 12px;
@@ -1652,5 +1682,18 @@ h2 {
   *:after {
     animation: none !important;
     transition: none !important;
+  }
+}
+@media (max-width: 360px) {
+  .mix-label {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+  }
+  .date-picker {
+    flex-basis: 100%;
+  }
+  .stat-heading {
+    flex-wrap: wrap;
   }
 }
