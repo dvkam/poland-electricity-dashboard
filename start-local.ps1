@@ -1,20 +1,34 @@
+param([string]$Distribution = 'Ubuntu-24.04')
 $ErrorActionPreference = 'Stop'
 $project = $PSScriptRoot
-$taskRoot = Split-Path (Split-Path $project -Parent) -Parent
-$bundledNode = 'C:\Users\David\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'
-if (!(Test-Path -LiteralPath $bundledNode)) { throw 'Bundled Node runtime not found. Use the standard npm run dev instructions in README.md.' }
-$linuxProject = (wsl -d Ubuntu-24.04 --exec wslpath -a $project.Replace('\','/')).Trim()
-$linuxTask = (wsl -d Ubuntu-24.04 --exec wslpath -a $taskRoot.Replace('\','/')).Trim()
-$linuxToolchain = "$linuxTask/work/toolchain"
-$logDir = Join-Path $taskRoot 'work'
-function Test-Endpoint([string]$url) {
-  try { return (Invoke-WebRequest -Uri $url -TimeoutSec 2).StatusCode -eq 200 } catch { return $false }
+$bundledNode = Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'
+$node = if ($env:NODE_BIN) { $env:NODE_BIN } elseif (Test-Path -LiteralPath $bundledNode) { $bundledNode } else { (Get-Command node.exe -ErrorAction SilentlyContinue).Source }
+if (!$node -or !(Test-Path -LiteralPath $node)) { throw 'Install Node 24+ or set NODE_BIN to its executable.' }
+if ([int](& $node -p 'process.versions.node.split(".")[0]') -lt 24) { throw 'Node 24+ is required.' }
+if (!(Test-Path "$project/node_modules/vite/bin/vite.js")) { throw 'Run npm ci in the project first.' }
+if (!(Test-Path "$project/backend/_build/default/bin/main.exe")) { throw 'Build the OCaml backend in WSL first; see README.md.' }
+$logDir = Join-Path $project '.local-run'
+New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+$linuxProject = (& wsl.exe -d $Distribution --exec wslpath -a $project.Replace('\','/')).Trim()
+if ($LASTEXITCODE -ne 0) { throw 'Could not resolve the project in WSL.' }
+function Test-Api {
+  try { return (Invoke-RestMethod 'http://127.0.0.1:8080/api/health' -TimeoutSec 2).service -eq 'prad-polski-ocaml' } catch { return $false }
 }
-if (!(Test-Endpoint 'http://127.0.0.1:8080/api/health')) {
-  $startScript = "export OPAMROOT='/var/tmp/codex-prad-polski-build/opam-root'; cd '$linuxProject/backend'; exec '$linuxToolchain/opam' exec --switch=prad-polski -- dune exec bin/main.exe"
-  Start-Process -FilePath 'wsl.exe' -ArgumentList @('-d','Ubuntu-24.04','--','bash','-lc',('"' + $startScript + '"')) -WindowStyle Hidden -RedirectStandardOutput (Join-Path $logDir 'api.log') -RedirectStandardError (Join-Path $logDir 'api-error.log') | Out-Null
+function Test-Frontend {
+  try { return (Invoke-WebRequest 'http://127.0.0.1:5173' -TimeoutSec 2).Content.Contains('/src/main.tsx') } catch { return $false }
 }
-if (!(Test-Endpoint 'http://127.0.0.1:5173')) {
-  Start-Process -FilePath $bundledNode -ArgumentList @('node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','5173') -WorkingDirectory $project -WindowStyle Hidden -RedirectStandardOutput (Join-Path $logDir 'vite.log') -RedirectStandardError (Join-Path $logDir 'vite-error.log') | Out-Null
+if (!(Test-Api)) {
+  $arguments = @('-d', $Distribution, '--cd', ('"' + $linuxProject + '/backend"'), '--exec', './_build/default/bin/main.exe')
+  $process = Start-Process wsl.exe -ArgumentList $arguments -WindowStyle Hidden -PassThru -RedirectStandardOutput "$logDir/api.log" -RedirectStandardError "$logDir/api-error.log"
+  $process.Id | Set-Content "$logDir/api.pid"
 }
-Write-Output 'Prąd Polski: http://127.0.0.1:5173 — the first source load can take several seconds.'
+if (!(Test-Frontend)) {
+  $process = Start-Process $node -ArgumentList @('node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','5173','--strictPort') -WorkingDirectory $project -WindowStyle Hidden -PassThru -RedirectStandardOutput "$logDir/vite.log" -RedirectStandardError "$logDir/vite-error.log"
+  $process.Id | Set-Content "$logDir/vite.pid"
+}
+for ($attempt = 0; $attempt -lt 20; $attempt++) {
+  if ((Test-Api) -and (Test-Frontend)) { Write-Output 'Prąd Polski: http://127.0.0.1:5173'; exit 0 }
+  Start-Sleep -Seconds 1
+}
+throw "Startup failed. Inspect logs in $logDir."
+
