@@ -1,4 +1,51 @@
-# Validation — 14 September 2026
+# Validation — 25 October 2026
+
+## Relocation and review iteration
+
+The active project is `C:\Users\David\Documents\ChatGPT\Dashboard electricity`.
+Recovered baseline: `7588c3d`. Implementation commits: `910a13b` (portable local
+startup), `f45f364` (cache/guidance), `abf445d` (time selection and evidence).
+The subsequent ownership correction prevents the launcher from silently reusing
+an unrelated app or another checkout. The separate WSL reference copy was not edited.
+
+Executed successfully against this project:
+
+- `npm run check`: strict TypeScript, type-aware Oxlint, Oxfmt, **12 unit tests**,
+  and the production build.
+- `npm run test:e2e`: **13 browser tests** in installed Microsoft Edge. UI tests
+  use deterministic fixtures; the live integration test uses the real OCaml API.
+  Coverage includes 92/96/100-quarter days, repeated-hour offsets, midnight
+  rollover versus deliberate history, failed date-change isolation, tariff copy,
+  synchronized selection, source dialog, CSV download, invalid API dates,
+  layout overflow at 320/390/768/1440 pixels, report links and keyboard focus.
+- `dune build` and `dune runtest`: **33 backend assertions**, including yesterday's
+  cache policy through both DST changes and rejection of fractional guidance codes.
+- `tests/verify-startup.ps1`: **3 startup checks**, confirming reuse of the same
+  managed processes and refusal when either ownership record is unavailable.
+- Actual backend working directory and executable resolved inside this project.
+  Restarted the rebuilt backend after tests; API health and Vite proxy responded.
+- Desktop and mobile live screenshots inspected. The new 320-pixel regression
+  initially failed because date controls overflowed; it passed after the layout fix.
+- Architecture report opened in the in-app browser, screenshots inspected at
+  desktop/mobile widths; local source links and visible keyboard focus verified.
+
+Live snapshot for 25 October: **100 intervals**, **100 RCE values**, **8 complete
+border-flow intervals**, and **no generation observations** at the check. PSE
+prices, flows and guidance fetched successfully; Energy-Charts generation was
+unavailable/unpublished. This limitation is visible as blanks and a source warning,
+not synthetic data. Counts are a snapshot, not an ongoing completeness guarantee.
+
+The original product/build discussions and all application source were reviewed
+using the requested Pocock, pstack and Emil guidance. Independent standards and
+spec reviews both identified the launcher ownership issue; it was fixed and
+re-reviewed with no further blocking finding. See `docs/review-2026-10-25.md` and
+`docs/architecture-review.html` for deferred issues and design rationale.
+
+Not executed: public deployment, Docker build/run, GitHub Actions on a remote
+runner, Safari/Firefox, or real physical-device touch testing. There is no remote
+configured and no commits were pushed.
+
+# Historical validation — 14 September 2026
 
 ## Executed successfully
 

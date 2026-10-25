@@ -62,7 +62,24 @@ Open http://127.0.0.1:5173. Vite proxies /api to the OCaml service. API_TARGET c
 
 ### Windows workspace shortcut
 
-The accompanying start-local.ps1 uses the isolated toolchain prepared for this workspace and the bundled Node runtime. Run it from PowerShell to start both services without opening extra windows. It checks existing health endpoints first. The compiler switch is kept in /var/tmp/codex-prad-polski-build/opam-root inside WSL; the standard instructions above remain the portable setup path.
+The working project is now `C:\Users\David\Documents\ChatGPT\Dashboard electricity`.
+Run `./start-local.ps1` from PowerShell to launch the built OCaml executable in
+Ubuntu-24.04 WSL and Vite on Windows, without opening extra windows. Logs and
+process IDs stay in `.local-run/`. The script resolves paths relative to itself,
+verifies both HTTP endpoints and managed process paths, and fails if startup is
+unsuccessful or an existing service belongs to another/unmanaged checkout.
+
+The launcher uses the bundled Node runtime; `NODE_BIN` can select another Node
+24+ executable. `-Distribution` selects a different WSL distribution, but the
+backend must first be built for that distribution. Run `npm ci` on Windows and
+build the backend using the instructions above for a fresh checkout. Do not
+share `node_modules` between Windows and Linux.
+
+The original recovered code is preserved in Git commit `7588c3d`. The separate
+WSL copy at `/home/david/workspace/prad-polski` was compared: its application
+source matches the recovered baseline, with differences only in launch/setup
+files. This folder is the active development copy. See
+[the review](docs/review-2026-10-25.md) and [architecture report](docs/architecture-review.html).
 
 ## Checks
 
@@ -129,7 +146,7 @@ PSE price/flow dtime_utc marks the end of the quarter-hour. Energy-Charts timest
 ## Deliberate MVP limits
 
 - File-based raw archive, not PostgreSQL. Suitable for one service instance; no shared multi-instance locking.
-- Historical data is fetched on demand. Today's data is refreshed every five minutes; historical cache TTL is six hours. No claim of complete long-term backfill.
+- Historical data is fetched on demand. Today and yesterday have a five-minute cache TTL so late publications can arrive after midnight; older dates use six hours. Background ingestion refreshes today. No claim of complete long-term backfill.
 - Cache revisions are retained without automatic deletion; operators should budget storage and configure archival retention for production.
 - No direct ENTSO-E token integration, carbon-intensity estimate, causal explanation, forecasting model, tariff optimiser, accounts, notifications or device control.
 - The data panel exposes provenance and timestamps, not a numerical confidence score.

@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Prąd Polski · Architecture review</title>
+  <style>
+    :root {
+      font:
+        16px/1.65 system-ui,
+        sans-serif;
+      color: #e9edf5;
+      background: #101722;
+      color-scheme: dark;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      max-width: 1180px;
+      margin: auto;
+      padding: 48px 28px;
+    }
+    h1,
+    h2,
+    h3 {
+      line-height: 1.2;
+      letter-spacing: -0.025em;
+    }
+    h1 {
+      font-size: clamp(32px, 5vw, 58px);
+      max-width: 850px;
+    }
+    h2 {
+      font-size: 27px;
+      margin-top: 48px;
+    }
+    h3 {
+      font-size: 20px;
+    }
+    p {
+      color: #bac7d9;
+      max-width: 85ch;
+    }
+    a {
+      color: #92c8ff;
+      overflow-wrap: anywhere;
+    }
+    a:focus-visible {
+      outline: 3px solid #edba63;
+      outline-offset: 4px;
+    }
+    .eyebrow {
+      color: #80cdb1;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: 12px;
+    }
+    .lead {
+      font-size: 20px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: #192333;
+      border: 1px solid #354155;
+      border-radius: 12px;
+      padding: 24px;
+      margin: 20px 0;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 12px;
+      border: 1px solid #4f826f;
+      color: #a9e2cc;
+      border-radius: 20px;
+      padding: 3px 10px;
+    }
+    .defer {
+      border-color: #9c7946;
+      color: #f3ce93;
+    }
+    .flow {
+      display: flex;
+      align-items: stretch;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 25px 0;
+    }
+    .node {
+      flex: 1 1 150px;
+      padding: 16px;
+      border: 1px solid #43526a;
+      border-radius: 8px;
+      background: #202d40;
+    }
+    .node small {
+      display: block;
+      color: #bac7d9;
+    }
+    .arrow {
+      align-self: center;
+      color: #80cdb1;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 14px;
+    }
+    th,
+    td {
+      text-align: left;
+      vertical-align: top;
+      padding: 14px;
+      border-bottom: 1px solid #364356;
+      overflow-wrap: anywhere;
+    }
+    th {
+      color: #9fceb8;
+    }
+    code {
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+    .note {
+      border-left: 3px solid #d5a95f;
+      padding-left: 18px;
+    }
+    footer {
+      margin-top: 50px;
+      color: #a8b6c8;
+    }
+    @media (max-width: 650px) {
+      body {
+        padding: 26px 16px;
+      }
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      .card {
+        padding: 18px;
+      }
+      th,
+      td {
+        padding: 8px;
+        font-size: 12px;
+      }
+      .arrow {
+        display: none;
+      }
+    }
+    @media print {
+      :root {
+        color: #162031;
+        background: white;
+        color-scheme: light;
+      }
+      p,
+      small {
+        color: #344155 !important;
+      }
+      .card,
+      .node {
+        background: #f7f8fa !important;
+        border-color: #aab4c0;
+      }
+      a {
+        color: #183d72;
+      }
+      .badge,
+      th {
+        color: #285d48;
+      }
+      body {
+        padding: 0;
+      }
+      .card {
+        break-inside: avoid;
+      }
+    }
+  </style>
+  <header>
+    <div class="eyebrow">Prąd Polski · 25 October 2026 · Local review</div>
+    <h1>Keep the grid story.<br />Make time and evidence dependable.</h1>
+    <p class="lead">
+      The MVP has the right core: one selected interval, explicit missing data, physical border
+      flows and honest tariff language. This iteration repairs time selection and local operation
+      without replacing the stack.
+    </p>
+    <p>
+      Recovered baseline <code>7588c3d</code>. The active source now lives in this project. Review
+      scope: both product/build conversations, React modules, OCaml ingestion and normalization,
+      tests, startup and responsive design.
+    </p>
+  </header>
+  <h2>Current data flow</h2>
+  <div class="flow">
+    <div class="node">
+      <b>Public providers</b
+      ><small>PSE prices, flows, guidance<br />Energy-Charts generation/load</small>
+    </div>
+    <span class="arrow">→</span>
+    <div class="node">
+      <b>Store module</b><small>Fetch and paginate<br />Same-date cache and raw revisions</small>
+    </div>
+    <span class="arrow">→</span>
+    <div class="node">
+      <b>Normalize module</b
+      ><small>UTC quarters, publication revisions<br />Nulls and explicit flow direction</small>
+    </div>
+    <span class="arrow">→</span>
+    <div class="node">
+      <b>React dashboard</b
+      ><small>Validated JSON, shared selection<br />Charts, summaries and evidence</small>
+    </div>
+  </div>
+  <p>
+    Failures preserve only a labelled response for the same date. Generation and demand remain
+    independent series. RCE remains a market indicator, not a household bill or a universal
+    day-ahead index.
+  </p>
+  <h2>Architecture candidates and decisions</h2>
+  <article class="card">
+    <span class="badge">Strong · Implemented</span>
+    <h3>Put calendar intent behind a small interface</h3>
+    <p>
+      <b>Files:</b> <a href="../src/useDashboardDay.ts">useDashboardDay.ts</a>,
+      <a href="../src/data.ts">data.ts</a>, <a href="../src/App.tsx">App.tsx</a>.
+    </p>
+    <div class="grid">
+      <div>
+        <h3>Before</h3>
+        <div class="node">
+          Date initialized once<small>Refresh continues yesterday indefinitely</small>
+        </div>
+        <div class="node">
+          Latest defaults to index 0<small>Absence can look like a future measurement</small>
+        </div>
+      </div>
+      <div>
+        <h3>After</h3>
+        <div class="node">
+          Today or history variant + clock<small
+            >Midnight advances only a follow-today selection</small
+          >
+        </div>
+        <div class="node">
+          Nullable latest index<small>Chart fallback stays separate from measurement status</small>
+        </div>
+      </div>
+    </div>
+    <p>
+      <b>Benefit:</b> greater depth and locality. One module owns the user's calendar intent, while
+      the existing data interface owns completion checks and labels. Tests use the same interface
+      and exercise clock changes in a real browser.
+    </p>
+  </article>
+  <article class="card">
+    <span class="badge">Worth exploring · Policy fix implemented</span>
+    <h3>Keep acquisition and persistence outcomes distinct</h3>
+    <p>
+      <b>Files:</b> <a href="../backend/lib/store.ml">store.ml</a>,
+      <a href="../backend/test/test_grid.ml">test_grid.ml</a>.
+    </p>
+    <div class="grid">
+      <div>
+        <h3>Before</h3>
+        <div class="node">
+          Midnight → six-hour historical cache<small>Late observations may be frozen out</small>
+        </div>
+        <div class="node">
+          Fetch + disk write in one catch<small>Disk failure is reported as source failure</small>
+        </div>
+      </div>
+      <div>
+        <h3>After / next</h3>
+        <div class="node">
+          Today and yesterday → five-minute TTL<small
+            >Implemented; both DST transitions tested</small
+          >
+        </div>
+        <div class="node">
+          Separate persistence seam<small
+            >Deferred: serve fresh data and independently report archive failure</small
+          >
+        </div>
+      </div>
+    </div>
+    <p>
+      Keep the public <code>load_day</code> interface. A targeted persistence seam offers leverage
+      for failure tests; a generic repository framework adds little value to this single-process
+      MVP.
+    </p>
+  </article>
+  <article class="card">
+    <span class="badge defer">Speculative · Deferred</span>
+    <h3>Index normalized publication rows once</h3>
+    <div class="grid">
+      <div>
+        <h3>Before</h3>
+        <div class="node">Each quarter scans and sorts source rows</div>
+      </div>
+      <div>
+        <h3>Possible after</h3>
+        <div class="node">One index per interval and border direction</div>
+      </div>
+    </div>
+    <p>
+      The pure normalizer already has good depth and tested semantics. Profile real retrieval days
+      before optimizing; no performance improvement is claimed.
+    </p>
+  </article>
+  <h2>Product and design review</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Before</th>
+        <th>After</th>
+        <th>Why</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Two autumn 02:15 readings look identical</td>
+        <td>UTC+2 and UTC+1 shown explicitly</td>
+        <td>Distinct intervals remain understandable</td>
+      </tr>
+      <tr>
+        <td>Mobile hides the selected date</td>
+        <td>Date remains visible</td>
+        <td>History retains its context</td>
+      </tr>
+      <tr>
+        <td>Dropdown chevron on a plain label</td>
+        <td>Plain interval readout</td>
+        <td>No false affordance</td>
+      </tr>
+      <tr>
+        <td>Source evidence can open below the fold</td>
+        <td>Focused source scrolls into view; UTC interval is visible</td>
+        <td>The evidence is directly inspectable</td>
+      </tr>
+      <tr>
+        <td>Date controls overflow at 320 px</td>
+        <td>Controls wrap; mix labels can shrink</td>
+        <td>Content remains accessible</td>
+      </tr>
+      <tr>
+        <td>Static tariff heading asserts falling prices</td>
+        <td>Conditional explanation</td>
+        <td>Educational copy cannot invent a live trend</td>
+      </tr>
+    </tbody>
+  </table>
+  <h2>Verification and practical limits</h2>
+  <p>
+    See <a href="../VALIDATION.md">the validation record</a> for executed checks and
+    <a href="review-2026-10-25.md">the full review</a> for requirements and deferred issues. Tests
+    cover completed/missing observations, 92/96/100-quarter days, repeated-hour labels, midnight
+    intent, retry isolation, source dialog, CSV and narrow layouts.
+  </p>
+  <p class="note">
+    Live upstream completeness is independent of test success. At this review's live check,
+    generation was unavailable for the current day while PSE supplied other series. The UI preserves
+    blanks and shows the source warning. Fixture data exists only in tests.
+  </p>
+  <p>
+    Not verified here: public deployment, Docker execution, remote CI execution, source licensing
+    for publication, exhaustive historical coverage, or future changes to EU timezone rules.
+    Remaining engineering work includes persistence failure separation, a total network deadline,
+    stronger whole-payload invariants, and archival retention.
+  </p>
+  <h2>Top recommendation</h2>
+  <p>
+    Continue from this verified local baseline. The next useful architecture investment is a tested
+    acquisition/persistence seam, followed by evidence-rich event explanations. A framework rewrite,
+    universal grid score, or household savings calculator would expand the problem before the
+    underlying evidence is dependable.
+  </p>
+  <footer>
+    Skills actually applied: Matt Pocock codebase design and architecture review; pstack TypeScript
+    and verification principles; Emil design engineering; local architecture HTML report. This file
+    is self-contained and makes no remote requests.
+  </footer>
+</html>
