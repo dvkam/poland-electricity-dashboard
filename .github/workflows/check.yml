@@ -1,0 +1,25 @@
+name: Checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: 5.5.0
+      - run: opam install ./backend --deps-only --with-test --locked --yes
+      - run: opam exec -- dune build --root backend
+      - run: opam exec -- dune runtest --root backend

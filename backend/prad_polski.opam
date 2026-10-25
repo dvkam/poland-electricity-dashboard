@@ -1,0 +1,15 @@
+opam-version: "2.0"
+name: "prad_polski"
+version: "0.1.0"
+synopsis: "Polish electricity dashboard API"
+maintainer: "Prad Polski maintainers"
+authors: ["Prad Polski contributors"]
+license: "MIT"
+build: [["dune" "build" "-p" name "-j" jobs]]
+depends: [
+  "ocaml" {= "5.5.0"}
+  "dune" {>= "3.20"}
+  "yojson" {>= "2.2"}
+  "cohttp-lwt-unix" {>= "6.0"}
+  "ptime" {>= "1.2"}
+]

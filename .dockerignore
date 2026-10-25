@@ -1,0 +1,8 @@
+node_modules
+dist
+data
+backend/_build
+backend/_opam
+.git
+playwright-report
+test-results
