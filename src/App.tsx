@@ -501,7 +501,7 @@ export function App() {
                   2,
                 )}
                 unit="GW"
-                detail="Suma raportowanych źródeł"
+                detail={point?.generationMw == null ? "Brak pełnych danych o produkcji" : "Suma raportowanych źródeł"}
                 icon={<Zap size={19} />}
                 onClick={() => evidence("generation")}
               />

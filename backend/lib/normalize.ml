@@ -25,7 +25,21 @@ let groups = [
   ("other", ["Others"; "Fossil oil"; "Other renewables"])
 ]
 
-(* Adapt the versioned source at the boundary. Never infer duration from gaps. *)
+let production_ids = [
+  "fossil_hard_coal", "Fossil hard coal"; "fossil_brown_coal_lignite", "Fossil brown coal / lignite";
+  "fossil_gas", "Fossil gas"; "fossil_coal_derived_gas", "Fossil coal-derived gas";
+  "wind_onshore", "Wind onshore"; "wind_offshore", "Wind offshore"; "solar", "Solar";
+  "hydro_run_of_river", "Hydro Run-of-River"; "hydro_water_reservoir", "Hydro water reservoir";
+  "biomass", "Biomass"; "hydro_pumped_storage", "Hydro pumped storage"; "battery", "Battery";
+  "others", "Others"; "fossil_oil", "Fossil oil"; "other_renewables", "Other renewables"
+]
+let auxiliary_ids = [
+  "load", "Load"; "renewable_share_of_generation", "Renewable share of generation";
+  "hydro_pumped_storage_consumption", "Hydro pumped storage consumption";
+  "battery_consumption", "Battery Consumption"; "cross_border_electricity_trading", "Trade";
+  "residual_load", "Residual load"; "renewable_share_of_load", "Renewable share of load"
+]
+
 let public_power_v2 payload =
   let minutes = number (field "interval_minutes" payload) in
   if string (field "schema_version" payload) <> Some "2.0"
@@ -34,17 +48,23 @@ let public_power_v2 payload =
     invalid_arg "Unsupported Energy-Charts schema, unit or interval";
   let rows = list (field "data" payload) in
   let times = List.map (fun row -> match timestamp "timestamp" row with
-    | Some t -> `Float t | None -> invalid_arg "Invalid generation timestamp") rows in
-  let series = list (field "series" payload) |> List.map (fun entry ->
-    let id = match string (field "id" entry) with Some id -> id | None -> invalid_arg "Missing series id" in
-    let name = match string (field "name" entry) with Some name -> name | None -> invalid_arg "Missing series name" in
-    `Assoc ["name", `String name; "data", `List (List.map (fun row -> field id (field "values" row)) rows)]) in
-  (* Offshore wind did not appear in the historical Polish source inventory. *)
-  let series = if List.exists (fun s -> string (field "name" s) = Some "Wind offshore") series
-    then series else series @ [`Assoc ["name", `String "Wind offshore";
-      "data", `List (List.map (fun _ -> `Float 0.) rows)]] in
-  `Assoc ["unix_seconds", `List times; "production_types", `List series;
-    "interval_minutes", json_number minutes]
+    | Some t -> t | None -> invalid_arg "Invalid generation timestamp") rows in
+  let ids = list (field "series" payload) |> List.map (fun entry ->
+    match string (field "id" entry) with Some id -> id | None -> invalid_arg "Missing series id") in
+  if List.length ids <> List.length (List.sort_uniq String.compare ids) then invalid_arg "Duplicate series id";
+  let mapping = production_ids @ auxiliary_ids in
+  let series = List.filter_map (fun id -> Option.map (fun name ->
+    `Assoc ["name", `String name; "data", `List (List.map (fun row -> field id (field "values" row)) rows)]
+  ) (List.assoc_opt id mapping)) ids in
+  (* This archived day has a verified inventory without offshore wind or batteries.
+     Sum only the published series for that day. Other omissions stay unknown. *)
+  let archived_inventory = times <> [] && List.for_all (fun t -> Time.today t = "2024-06-14") times in
+  let applicable id = not (archived_inventory && (id = "battery" || id = "wind_offshore") && not (List.mem id ids)) in
+  let complete = List.for_all (fun (id, _) -> not (applicable id) || List.mem id ids) production_ids
+    && List.for_all (fun id -> List.mem_assoc id mapping) ids in
+  `Assoc ["unix_seconds", `List (List.map (fun t -> `Float t) times); "production_types", `List series;
+    "reportedOnshoreOnly", `Bool (not (applicable "wind_offshore"));
+    "completeInventory", `Bool complete; "interval_minutes", json_number minutes]
 
 let power_index power =
   let times = Array.of_list (list (field "unix_seconds" power)) in
@@ -64,9 +84,11 @@ let power_index power =
            means no reported series; an explicitly null value stays unknown. *)
         let mix = List.map (fun (key, names) ->
           let names = if key = "storage" && List.mem_assoc "Battery" types
-            then "Battery" :: names else names in
+            then "Battery" :: names
+            else if key = "wind" && field "reportedOnshoreOnly" power = `Bool true then ["Wind onshore"]
+            else names in
           key, sum (List.map get names)) groups in
-        let total = sum (List.map snd mix) in
+        let total = if field "completeInventory" power = `Bool false then None else sum (List.map snd mix) in
         let share = match get "Renewable share of generation" with
           | Some n when n >= 0. && n <= 100. -> Some n | _ -> None in
         Hashtbl.replace points (int_of_float start) (mix, total, share, get "Load", get "Hydro pumped storage consumption")

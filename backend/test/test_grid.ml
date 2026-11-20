@@ -121,14 +121,13 @@ let () =
   let start = Option.get (Time.bounds "2024-06-14") |> fst in
   let source minutes timestamps = `Assoc [
     "schema_version", `String "2.0"; "unit", `String "MW"; "interval_minutes", `Int minutes;
-    "series", `List (List.concat_map snd Normalize.groups |> List.filter (fun name -> name <> "Wind offshore")
-      |> List.map (fun name -> `Assoc ["id", `String name; "name", `String name]));
+    "series", `List (List.map (fun (id, _) -> `Assoc ["id", `String id; "name", `String "Changed label"]) Normalize.production_ids);
     "data", `List (List.map (fun t -> `Assoc ["timestamp", `String (Time.iso t);
-      "values", `Assoc (List.concat_map snd Normalize.groups |> List.map (fun name -> name, `Float 100.))]) timestamps)] in
+      "values", `Assoc (List.map (fun (id, _) -> id, `Float 100.) Normalize.production_ids)]) timestamps)] in
   let normalize minutes times = Normalize.day ~date:"2024-06-14"
     ~power:(Normalize.public_power_v2 (source minutes times)) ~flows:empty ~prices:empty ~guidance:empty in
   let hourly = normalize 60 [start; start +. 7200.] in
-  check "hourly averages cover exactly four quarters" (List.init 4 (fun i -> get "generationMw" (List.nth hourly i)) = List.init 4 (fun _ -> `Float 1300.));
+  check "hourly averages cover exactly four quarters" (List.init 4 (fun i -> get "generationMw" (List.nth hourly i)) = List.init 4 (fun _ -> `Float 1500.));
   check "missing source hour stays missing" (get "generationMw" (List.nth hourly 4) = `Null);
   check "source hour boundaries survive quarter alignment"
     (get "generationStart" (List.nth hourly 3) = `String (Time.iso start)
@@ -141,8 +140,17 @@ let () =
     let power = Normalize.public_power_v2 (source 60 times) in
     let points = Normalize.day ~date ~power ~flows:empty ~prices:empty ~guidance:empty in
     check ("hourly source covers DST day " ^ date)
-      (List.for_all (fun p -> get "generationMw" p = `Float 1300.) points)
+      (List.for_all (fun p -> get "generationMw" p = `Float 1500.) points)
   ) ["2026-03-29"; "2026-10-25"];
+  let inventory ids =
+    let raw = source 15 [start +. 86400.] in
+    let raw = `Assoc (("series", `List (List.map (fun id -> `Assoc ["id", `String id]) ids)) ::
+      (match raw with `Assoc fields -> List.remove_assoc "series" fields | _ -> assert false)) in
+    let points = Normalize.day ~date:"2024-06-15" ~power:(Normalize.public_power_v2 raw) ~flows:empty ~prices:empty ~guidance:empty in
+    get "generationMw" (List.hd points) in
+  let ids = List.map fst Normalize.production_ids in
+  check "unclassified series blocks fuel total" (inventory ("new_fuel" :: ids) = `Null);
+  check "missing offshore series blocks unverified total" (inventory (List.filter ((<>) "wind_offshore") ids) = `Null);
   let dir = Filename.temp_file "grid-snapshot-test" "" in
   Sys.remove dir; Unix.mkdir dir 0o700;
   Fun.protect ~finally:(fun () -> Array.iter (fun f -> Sys.remove (Filename.concat dir f)) (Sys.readdir dir); Unix.rmdir dir)
