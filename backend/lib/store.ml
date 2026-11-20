@@ -51,7 +51,7 @@ let valid_pse_row ~date id row =
 
 let validate ~date id payload =
   let payload = if id = "generation" then
-    (try Normalize.public_power_v2 payload with Invalid_argument _ ->
+    (try Normalize.public_power_v2 ~date payload with Invalid_argument _ ->
       raise (Source_error "Nieobsługiwany format, jednostka lub okres danych produkcji."))
     else payload in
   let key = if id = "generation" then "unix_seconds" else "value" in
@@ -186,7 +186,7 @@ let source_json resource =
 
 let day_response date resources =
   let payload id = match List.find_opt (fun r -> r.id = id) resources with Some r -> r.payload | None -> `Null in
-  let power = match payload "generation" with `Null -> `Null | p -> Normalize.public_power_v2 p in
+  let power = match payload "generation" with `Null -> `Null | p -> Normalize.public_power_v2 ~date p in
   let points = Normalize.day ~date ~power ~flows:(payload "flows")
     ~prices:(payload "prices") ~guidance:(payload "guidance") in
   `Assoc [

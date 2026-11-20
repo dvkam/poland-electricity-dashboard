@@ -40,18 +40,36 @@ let auxiliary_ids = [
   "residual_load", "Residual load"; "renewable_share_of_load", "Renewable share of load"
 ]
 
-let public_power_v2 payload =
+let public_power_v2 ~date payload =
   let minutes = number (field "interval_minutes" payload) in
-  if string (field "schema_version" payload) <> Some "2.0"
-     || string (field "unit" payload) <> Some "MW"
-     || not (minutes = Some 15. || minutes = Some 60.) then
-    invalid_arg "Unsupported Energy-Charts schema, unit or interval";
+  let resolution = string (field "resolution" payload) in
+  if field "schema_version" payload <> `String "2.0"
+     || field "country" payload <> `String "pl"
+     || field "endpoint" payload <> `String "public_power"
+     || field "unit" payload <> `String "MW"
+     || not ((minutes = Some 15. && resolution = Some "PT15M")
+          || (minutes = Some 60. && resolution = Some "PT1H")) then
+    invalid_arg "Unexpected generation feed or resolution";
+  let first, last = match Time.bounds date with
+    | Some bounds -> bounds | None -> invalid_arg "Invalid generation date" in
+  let duration = Option.get minutes *. 60. in
   let rows = list (field "data" payload) in
-  let times = List.map (fun row -> match timestamp "timestamp" row with
-    | Some t -> t | None -> invalid_arg "Invalid generation timestamp") rows in
   let ids = list (field "series" payload) |> List.map (fun entry ->
-    match string (field "id" entry) with Some id -> id | None -> invalid_arg "Missing series id") in
-  if List.length ids <> List.length (List.sort_uniq String.compare ids) then invalid_arg "Duplicate series id";
+    match string (field "id" entry) with Some id when id <> "" -> id | _ -> invalid_arg "Missing series id") in
+  let sorted_ids = List.sort String.compare ids in
+  if ids = [] || sorted_ids <> List.sort_uniq String.compare ids then invalid_arg "Invalid series inventory";
+  let seen = Hashtbl.create 100 in
+  let times = List.map (fun row ->
+    let t = match timestamp "timestamp" row with
+      | Some t when t >= first && t +. duration <= last && mod_float (t -. first) duration = 0.
+                    && not (Hashtbl.mem seen t) -> t
+      | _ -> invalid_arg "Invalid or repeated generation interval" in
+    Hashtbl.add seen t ();
+    (match field "values" row with
+     | `Assoc fields when List.sort String.compare (List.map fst fields) = sorted_ids
+                       && List.for_all (fun (_, v) -> v = `Null || Option.is_some (number v)) fields -> ()
+     | _ -> invalid_arg "Invalid generation measurements");
+    t) rows in
   let mapping = production_ids @ auxiliary_ids in
   let series = List.filter_map (fun id -> Option.map (fun name ->
     `Assoc ["name", `String name; "data", `List (List.map (fun row -> field id (field "values" row)) rows)]

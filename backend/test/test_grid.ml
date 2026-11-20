@@ -120,12 +120,14 @@ let () =
 let () =
   let start = Option.get (Time.bounds "2024-06-14") |> fst in
   let source minutes timestamps = `Assoc [
+    "endpoint", `String "public_power"; "country", `String "pl";
+    "resolution", `String (if minutes = 15 then "PT15M" else "PT1H");
     "schema_version", `String "2.0"; "unit", `String "MW"; "interval_minutes", `Int minutes;
     "series", `List (List.map (fun (id, _) -> `Assoc ["id", `String id; "name", `String "Changed label"]) Normalize.production_ids);
     "data", `List (List.map (fun t -> `Assoc ["timestamp", `String (Time.iso t);
       "values", `Assoc (List.map (fun (id, _) -> id, `Float 100.) Normalize.production_ids)]) timestamps)] in
   let normalize minutes times = Normalize.day ~date:"2024-06-14"
-    ~power:(Normalize.public_power_v2 (source minutes times)) ~flows:empty ~prices:empty ~guidance:empty in
+    ~power:(Normalize.public_power_v2 ~date:"2024-06-14" (source minutes times)) ~flows:empty ~prices:empty ~guidance:empty in
   let hourly = normalize 60 [start; start +. 7200.] in
   check "hourly averages cover exactly four quarters" (List.init 4 (fun i -> get "generationMw" (List.nth hourly i)) = List.init 4 (fun _ -> `Float 1500.));
   check "missing source hour stays missing" (get "generationMw" (List.nth hourly 4) = `Null);
@@ -134,19 +136,21 @@ let () =
      && get "generationEnd" (List.nth hourly 3) = `String (Time.iso (start +. 3600.)));
   let quarter = normalize 15 [start; start +. 3600.] in
   check "gaps do not turn quarter-hour readings into hourly averages" (get "generationMw" (List.nth quarter 1) = `Null);
-  check "unsupported source duration is rejected" (try ignore (Normalize.public_power_v2 (source 30 [start])); false with Invalid_argument _ -> true);
+  check "unsupported source duration is rejected" (try ignore (Normalize.public_power_v2 ~date:"2024-06-14" (source 30 [start])); false with Invalid_argument _ -> true);
   List.iter (fun date ->
     let times = Time.slots date |> List.filteri (fun i _ -> i mod 4 = 0) in
-    let power = Normalize.public_power_v2 (source 60 times) in
+    let power = Normalize.public_power_v2 ~date (source 60 times) in
     let points = Normalize.day ~date ~power ~flows:empty ~prices:empty ~guidance:empty in
     check ("hourly source covers DST day " ^ date)
       (List.for_all (fun p -> get "generationMw" p = `Float 1500.) points)
   ) ["2026-03-29"; "2026-10-25"];
   let inventory ?(date="2024-06-15") ids =
     let raw = source 15 [Option.get (Time.bounds date) |> fst] in
-    let raw = `Assoc (("series", `List (List.map (fun id -> `Assoc ["id", `String id]) ids)) ::
-      (match raw with `Assoc fields -> List.remove_assoc "series" fields | _ -> assert false)) in
-    let points = Normalize.day ~date ~power:(Normalize.public_power_v2 raw) ~flows:empty ~prices:empty ~guidance:empty in
+    let raw = `Assoc (["series", `List (List.map (fun id -> `Assoc ["id", `String id]) ids);
+      "data", `List [`Assoc ["timestamp", get "timestamp" (List.hd (Normalize.list (get "data" raw)));
+        "values", `Assoc (List.map (fun id -> id, `Float 100.) ids)]]]
+      @ (match raw with `Assoc fields -> List.remove_assoc "data" (List.remove_assoc "series" fields) | _ -> assert false)) in
+    let points = Normalize.day ~date ~power:(Normalize.public_power_v2 ~date raw) ~flows:empty ~prices:empty ~guidance:empty in
     List.hd points in
   let ids = List.map fst Normalize.production_ids in
   check "unclassified series blocks fuel total" (get "generationMw" (inventory ("new_fuel" :: ids)) = `Null);
@@ -196,3 +200,39 @@ let () =
   check "auxiliary-only flow report cannot replace the cache"
     (try Store.require_displayed_section "flows" (report ["UA_DOB-PL"]); false with Store.Source_error _ -> true);
   Store.require_displayed_section "flows" (report ["UA_DOB-PL"; "DE-PL"])
+
+let () =
+  let date = "2026-10-25" in
+  let first, last = Option.get (Time.bounds date) in
+  let row t values = `Assoc ["timestamp", `String (Time.iso t); "values", values] in
+  let values n = `Assoc ["load", n] in
+  let good_row = row first (values (`Int 400)) in
+  let payload rows = `Assoc ["country", `String "pl"; "endpoint", `String "public_power";
+    "schema_version", `String "2.0"; "unit", `String "MW"; "interval_minutes", `Int 15;
+    "resolution", `String "PT15M"; "series", `List [`Assoc ["id", `String "load"]];
+    "data", `List rows] in
+  let previous = payload [good_row] in
+  let replace key value = match previous with `Assoc fields -> `Assoc ((key,value)::List.remove_assoc key fields)
+    | _ -> assert false in
+  let dir = Filename.temp_file "generation-cache" "" in
+  Sys.remove dir; Unix.mkdir dir 0o700;
+  Fun.protect ~finally:(fun () -> Array.iter (fun f -> Sys.remove (Filename.concat dir f)) (Sys.readdir dir); Unix.rmdir dir)
+    (fun () ->
+      let path = Filename.concat dir ("generation-v2-" ^ date ^ ".json") in
+      Store.save path previous 1.;
+      let refresh candidate = Lwt_main.run (Store.get_with ~directory:dir
+        ~fetch:(fun _ -> Lwt.return candidate) ~date ~id:"generation" ~url:"fixture") in
+      List.iter (fun (label, candidate) ->
+        let result = refresh candidate in
+        check ("preserve cached Polish generation on " ^ label)
+          (result.cached && Option.is_some result.error && result.payload = previous
+           && Store.read path = Some (previous, 1.) && Array.length (Sys.readdir dir) = 2))
+        ["wrong country", replace "country" (`String "de"); "wrong endpoint", replace "endpoint" (`String "price");
+         "wrong unit", replace "unit" (`String "GW"); "conflicting resolution", replace "resolution" (`String "PT1H");
+         "other day", payload [row last (values `Null)]; "off-grid time", payload [row (first +. 1.) (values `Null)];
+         "duplicate instant", payload [good_row; good_row]; "missing measurements", payload [row first `Null];
+         "missing series value", payload [row first (`Assoc [])]; "nonnumeric value", payload [row first (values (`String "0"))]];
+      let partial = payload [good_row; row (last -. 900.) (values `Null)] in
+      let result = refresh partial in
+      check "accept valid partial DST publication with explicit null" (result.error = None && result.payload = partial
+        && Option.map fst (Store.read path) = Some partial))
