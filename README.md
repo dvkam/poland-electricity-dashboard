@@ -100,6 +100,12 @@ PSE flow values describe physical exchange. The backend combines both directions
 
 Energy-Charts timestamps identify interval starts. PSE price and flow timestamps identify interval ends. The backend preserves UTC boundaries and the UI displays Warsaw time. PSE guidance is hourly and uses only active publications.
 
+### When a value is missing
+
+The interval renewable percentage comes directly from Energy-Charts. A missing percentage stays blank even if a fuel breakdown is available. The backend checks the fuel inventory before adding generation. An unknown category or missing required fuel suppresses the total. The verified inventory for 14 June 2024 permits a reported total without offshore wind or battery series. Other dates with the same omissions can have a blank total. A published demand reading can still appear for that interval.
+
+PSE price and flow rows must match the requested Warsaw day and quarter. Each page must pass validation before a new response replaces the cache. Flow reports can contain historical auxiliary sections. The national figure currently sums the six displayed country pairs and requires both directions on each pair. A failed fetch can reuse a previous response for that date. If a download succeeds but the snapshot write fails, the dashboard shows the fresh readings with a storage warning.
+
 ## History and snapshots
 
 Historical data is requested from the upstream APIs on demand. A database is not required to browse it. Today and yesterday refresh after five minutes; older dates use a six-hour cache. Background ingestion refreshes today.
