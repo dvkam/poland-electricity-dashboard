@@ -63,6 +63,7 @@ let public_power_v2 payload =
   let complete = List.for_all (fun (id, _) -> not (applicable id) || List.mem id ids) production_ids
     && List.for_all (fun id -> List.mem_assoc id mapping) ids in
   `Assoc ["unix_seconds", `List (List.map (fun t -> `Float t) times); "production_types", `List series;
+    "reportedPumpedOnly", `Bool (not (applicable "battery"));
     "reportedOnshoreOnly", `Bool (not (applicable "wind_offshore"));
     "completeInventory", `Bool complete; "interval_minutes", json_number minutes]
 
@@ -87,7 +88,9 @@ let power_index power =
             then "Battery" :: names
             else if key = "wind" && field "reportedOnshoreOnly" power = `Bool true then ["Wind onshore"]
             else names in
-          key, sum (List.map get names)) groups in
+          let missing_battery = key = "storage" && field "completeInventory" power = `Bool false
+            && not (List.mem_assoc "Battery" types) && field "reportedPumpedOnly" power <> `Bool true in
+          key, (if missing_battery then None else sum (List.map get names))) groups in
         let total = if field "completeInventory" power = `Bool false then None else sum (List.map snd mix) in
         let share = match get "Renewable share of generation" with
           | Some n when n >= 0. && n <= 100. -> Some n | _ -> None in
