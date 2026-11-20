@@ -7,3 +7,8 @@
  (name replay_day)
  (modules replay_day)
  (libraries grid yojson))
+
+(test
+ (name test_refresh)
+ (modules test_refresh)
+ (libraries grid lwt.unix unix yojson))

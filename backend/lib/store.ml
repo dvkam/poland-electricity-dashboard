@@ -3,11 +3,23 @@ open Lwt.Infix
 type resource = { payload : Yojson.Safe.t; fetched_at : float option; cached : bool; error : string option; url : string; id : string }
 let directory = Option.value ~default:"../data" (Sys.getenv_opt "DATA_DIR")
 let () = if not (Sys.file_exists directory) then Unix.mkdir directory 0o750
-let locks : (string, Lwt_mutex.t) Hashtbl.t = Hashtbl.create 32
-let lock key = match Hashtbl.find_opt locks key with Some lock -> lock | None ->
-  let lock = Lwt_mutex.create () in Hashtbl.add locks key lock; lock
-
 exception Source_error of string
+exception Retry_after of int * float
+
+let retry_time ~now value =
+  let value = String.trim value in
+  match int_of_string_opt value with
+  | Some seconds when seconds >= 0 -> Some (now +. float_of_int seconds)
+  | _ ->
+      let months = ["Jan"; "Feb"; "Mar"; "Apr"; "May"; "Jun";
+        "Jul"; "Aug"; "Sep"; "Oct"; "Nov"; "Dec"] in
+      try Scanf.sscanf value "%3s, %d %s %d %d:%d:%d GMT%!"
+        (fun _ day month year hour minute second ->
+          match List.find_index ((=) month) months with
+          | None -> None
+          | Some m -> Option.map Ptime.to_float_s
+              (Ptime.of_date_time ((year, m + 1, day), ((hour, minute, second), 0))))
+      with Scanf.Scan_failure _ | End_of_file | Failure _ -> None
 
 let decode_response status body =
   if status < 200 || status >= 300 then
@@ -81,18 +93,25 @@ let persist persist_fn payload fetched_at =
 
 let request url =
   let argv = [| "curl"; "--silent"; "--show-error"; "--location";
-    "--write-out"; "\n%{http_code}";
+    "--write-out"; "\n%{http_code} %header{retry-after}";
     "--max-time"; "25"; "--connect-timeout"; "8"; "--max-filesize"; "8000000"; url |] in
-  Lwt_process.with_process_full ("curl", argv) (fun process ->
+  let process = Lwt_process.open_process_full ("curl", argv) in
+  Lwt.finalize (fun () ->
     Lwt.both (Lwt_io.read process#stdout) (Lwt_io.read process#stderr) >>= fun (body, stderr) ->
     process#status >>= function
     | Unix.WEXITED 0 ->
         let split = String.rindex body '\n' in
-        let status = int_of_string (String.sub body (split + 1) (String.length body - split - 1)) in
-        Lwt.return (decode_response status (String.sub body 0 split))
+        let status = int_of_string (String.sub body (split + 1) 3) in
+        let retry = String.sub body (split + 5) (String.length body - split - 5) in
+        (match status, retry_time ~now:(Unix.gettimeofday ()) retry with
+        | (429 | 503), Some until -> Lwt.fail (Retry_after (status, until))
+        | _ -> Lwt.return (decode_response status (String.sub body 0 split)))
     | _ ->
         prerr_endline ("Source transport failed: " ^ url ^ " " ^ stderr);
         Lwt.fail (Source_error "Nie udało się połączyć ze źródłem (sieć lub limit czasu)."))
+    (fun () ->
+      (match process#state with Lwt_process.Running -> process#terminate | _ -> ());
+      process#close >|= fun _ -> ())
 
 let rec paginated ~fetch ~date ~id ?(remaining=20) url =
   fetch url >>= fun payload ->
@@ -133,34 +152,72 @@ let cache_ttl ~date ~now =
     | None -> assert false in
   if date = today || date = yesterday then 300. else 21600.
 
-let get_with ~directory ~fetch ~date ~id ~url =
-  let key = (if id = "generation" then "generation-v2" else id) ^ "-" ^ date in
-  Lwt_mutex.with_lock (lock key) (fun () ->
-    let path = Filename.concat directory (key ^ ".json") in
-    let previous = Option.bind (read path) (fun (payload, t) ->
-      try validate ~date id payload; require_displayed_section id payload; Some (payload, t) with Source_error _ -> None) in
-    let now = Unix.gettimeofday () in
-    let ttl = cache_ttl ~date ~now in
-    match previous with
-    | Some (payload, fetched) when now -. fetched < ttl ->
-        Lwt.return {payload; fetched_at=Some fetched; cached=true; error=None; url; id}
-    | _ ->
-        Lwt.catch
-          (fun () -> paginated ~fetch ~date ~id url >|= fun payload ->
-            require_displayed_section id payload;
-            let fetched_at = Unix.gettimeofday () in
-            let error = persist (save path) payload fetched_at in
-            {payload; fetched_at=Some fetched_at; cached=false; error; url; id})
-          (fun exn ->
-            prerr_endline ("Source fetch failed: " ^ url ^ " " ^ Printexc.to_string exn);
-            let reason = match exn with Source_error message -> message
-              | _ -> "Nie udało się przetworzyć odpowiedzi źródła." in
-            let payload, fetched = match previous with Some (p, t) -> p, Some t | None -> `Null, None in
-            Lwt.return {payload; fetched_at=fetched; cached=Option.is_some fetched;
-              error=Some (reason ^ (if Option.is_some fetched then " Pokazujemy ostatni dostępny zapis." else ""));
-              url; id}))
+let cache_path ~directory ~date id =
+  let prefix = if id = "generation" then "generation-v2" else id in
+  Filename.concat directory (prefix ^ "-" ^ date ^ ".json")
 
-let get = get_with ~directory ~fetch:request
+type flight = { result : resource Lwt.t; stale : resource option }
+type refresh_state = {
+  flights : (string, flight) Hashtbl.t;
+  mutable failures : (string * (float * string)) list;
+  now : unit -> float;
+  timeout : float;
+}
+
+let refresh_state ?(now=Unix.gettimeofday) ?(timeout=40.) () =
+  {flights=Hashtbl.create 16; failures=[]; now; timeout}
+
+let serve_flight flight =
+  match flight.stale, Lwt.state flight.result with
+  | Some stale, Lwt.Sleep -> Lwt.return stale
+  | _ -> Lwt.protected flight.result
+
+let get_using state ~directory ~fetch ~date ~id ~url =
+  let path = cache_path ~directory ~date id in
+  match Hashtbl.find_opt state.flights path with
+  | Some flight -> serve_flight flight
+  | None ->
+    let previous = Option.bind (read path) (fun (payload, t) ->
+      try validate ~date id payload; require_displayed_section id payload;
+          Some {payload; fetched_at=Some t; cached=true; error=None; url; id}
+      with Source_error _ -> None) in
+    let now = state.now () in
+    let fallback reason = match previous with
+      | Some old -> {old with error=Some (reason ^ " Pokazujemy ostatni dostępny zapis.")}
+      | None -> {payload=`Null; fetched_at=None; cached=false; error=Some reason; url; id} in
+    state.failures <- List.filter (fun (_, (until, _)) -> until > now) state.failures;
+    match previous, List.assoc_opt path state.failures with
+    | Some ({fetched_at=Some t; _} as old), _ when now -. t < cache_ttl ~date ~now -> Lwt.return old
+    | _, Some (_, reason) -> Lwt.return (fallback reason)
+    | _ ->
+        let result = Lwt.catch (fun () ->
+          Lwt_unix.with_timeout state.timeout (fun () -> paginated ~fetch ~date ~id url)
+          >|= fun payload ->
+          require_displayed_section id payload;
+          let fetched_at = state.now () in
+          let error = persist (save path) payload fetched_at in
+          {payload; fetched_at=Some fetched_at; cached=false; error; url; id})
+          (fun exn ->
+            let now = state.now () in
+            let reason, retry_at = match exn with
+              | Retry_after (status, until) ->
+                  Printf.sprintf "Źródło zwróciło HTTP %d." status, max (now +. 1.) until
+              | Source_error message -> message, now +. 30.
+              | Lwt_unix.Timeout -> "Upłynął czas na pobranie raportu.", now +. 30.
+              | _ -> "Nie udało się przetworzyć odpowiedzi źródła.", now +. 30. in
+            prerr_endline ("Source fetch failed: " ^ url ^ " " ^ Printexc.to_string exn);
+            state.failures <- List.take 256 ((path, (retry_at, reason)) :: state.failures);
+            Lwt.return (fallback reason)) in
+        let stale = Option.map (fun _ -> fallback "Trwa aktualizacja danych.") previous in
+        let flight = {result; stale} in
+        Hashtbl.add state.flights path flight;
+        Lwt.on_termination result (fun () -> Hashtbl.remove state.flights path);
+        serve_flight flight
+
+let get_with ~directory ~fetch ~date ~id ~url =
+  get_using (refresh_state ()) ~directory ~fetch ~date ~id ~url
+
+let get = get_using (refresh_state ()) ~directory ~fetch:request
 
 let source_json resource =
   let name, note, home = match resource.id with
