@@ -1,4 +1,12 @@
-# Validation — 25 October 2026
+# Verification record
+
+## 20 November 2026
+
+At revision `abb4456`, the local frontend checks, OCaml regressions and 16 browser tests passed. GitHub ran the frontend checks, backend build and tests, and the numerical browser replay on Linux. Both jobs [completed successfully](https://github.com/dvkam/poland-electricity-dashboard/actions/runs/44651887027).
+
+The replay covers 25 October 2026, 20:00 to 20:15 in Warsaw, starting at 19:00 UTC. The archived source responses produce 18.40 GW public net generation, 18.22 GW demand, 41.8% renewable generation, 523.01 PLN/MWh RCE, 0.15 GW net export and ordinary-use guidance. The test checks the text in the browser. It exercises one interval with complete source coverage. Historical coverage, missing data and publication revisions have separate regression cases.
+
+## 25 October 2026
 
 ## Hourly history and publication preparation
 
