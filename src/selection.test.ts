@@ -53,6 +53,7 @@ describe("Warsaw observation selection", () => {
     expect(latestIndex([{ ...point, generationMw: null }], now + 3_600_000)).toBeNull();
     expect(observationState(point, "2026-10-25", now)).toBe("Brak pomiaru");
     expect(latestIndex([point], now + 600_000)).toBe(0);
+    expect(latestIndex([{ ...point, generationMw: null, demandMw: 18222 }], now + 600_000)).toBe(0);
     const hourly = { ...point, generationEnd: "2026-10-24T23:00:00Z" };
     expect(latestIndex([hourly], now + 600_000)).toBeNull();
     expect(latestIndex([hourly], now + 3_600_000)).toBe(0);

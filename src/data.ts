@@ -138,7 +138,9 @@ export const dateLabel = (date: string) =>
   }).format(new Date(date + "T12:00:00Z"));
 
 export function completedGeneration(point: Point, now: number): boolean {
-  return point.generationMw !== null && Date.parse(point.generationEnd ?? point.end) <= now;
+  const hasReading = point.generationMw !== null || point.demandMw !== null ||
+    point.renewablePercent !== null || Object.values(point.generation).some(value => value !== null);
+  return hasReading && Date.parse(point.generationEnd ?? point.end) <= now;
 }
 
 export function latestIndex(points: readonly Point[], now = Date.now()): number | null {
