@@ -30,7 +30,11 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: opam exec -- dune build --root backend test/replay_day.exe
-      - run: npx playwright test tests/source-numbers.spec.ts
+      - name: Compare the complete API day with the provider fixtures
+        run: |
+          backend/_build/default/test/replay_day.exe 2026-10-25 tests/source-records > "$RUNNER_TEMP/dashboard-day.json"
+          python3 tests/verify_source.py "$RUNNER_TEMP/dashboard-day.json" tests/source-records
+      - run: npx playwright test tests/source-numbers.spec.ts tests/daily-summary.spec.ts tests/refresh.spec.ts
         env:
           REPLAY_ONLY: "1"
           PLAYWRIGHT_CHANNEL: chromium
