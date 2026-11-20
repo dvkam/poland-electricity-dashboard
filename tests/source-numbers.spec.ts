@@ -8,7 +8,9 @@ test("renders the published storage interval and PSE readings", async ({ page })
   const windows = process.platform === "win32";
   const body = execFileSync(
     windows ? "wsl.exe" : args[0]!,
-    windows ? ["-d", "Ubuntu-24.04", "--exec", ...args] : args.slice(1),
+    windows
+      ? ["-d", process.env["WSL_DISTRO"] ?? "Ubuntu-24.04", "--exec", ...args]
+      : args.slice(1),
     { cwd: "backend", encoding: "utf8" },
   );
   await page.clock.install({ time: new Date("2026-10-25T21:00:00Z") });

@@ -131,7 +131,7 @@ The frontend check runs TypeScript, linting, formatting, unit tests and the prod
 npm run test:e2e
 ```
 
-Browser tests use installed Microsoft Edge by default. On Linux, install Chromium with `npx playwright install chromium` and set `PLAYWRIGHT_CHANNEL=chromium`. Most tests use fixtures; the live integration test needs upstream services.
+Browser tests use installed Microsoft Edge by default. On Linux, install Chromium with `npx playwright install chromium` and set `PLAYWRIGHT_CHANNEL=chromium`. Build the source replay executable with `opam exec -- dune build test/replay_day.exe` from `backend/`. On Windows, `WSL_DISTRO` selects the distribution used for the replay. The numerical regression sends archived Energy-Charts and PSE records through the OCaml presenter and checks the rendered values. Most tests use fixtures; the live integration test needs upstream services.
 
 ## Current limits
 
