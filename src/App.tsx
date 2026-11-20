@@ -201,7 +201,9 @@ function Stories({ day, now }: { day: Day; now: number }) {
           </span>
           <span className="story-kicker">UDZIAŁ ODNAWIALNYCH</span>
           <h3>
-            {share === null ? "Niepełny obraz dnia" : numberLabel(share, 1) + "% produkcji publicznej z OZE"}
+            {share === null
+              ? "Niepełny obraz dnia"
+              : numberLabel(share, 1) + "% produkcji publicznej z OZE"}
           </h3>
           <p>
             Szacunek ważony energią z przedziałów o pełnych danych. Dzisiejsze dane mogą być

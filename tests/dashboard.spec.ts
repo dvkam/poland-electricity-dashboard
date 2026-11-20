@@ -149,3 +149,16 @@ test("hourly generation keeps its original interval when selecting a quarter", a
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
   ).toBeTruthy();
 });
+
+test("a failed snapshot write keeps the fresh delivery label", async ({ page }) => {
+  const day = fixtureDay();
+  const source = day.sources[0];
+  if (!source) throw new Error("Missing generation source");
+  source.error = "Dane pobrano, ale nie udało się zapisać lokalnej kopii.";
+  await page.route("**/api/v1/day?*", (route) => route.fulfill({ json: day }));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Sprawdź źródła" }).click();
+  const card = page.locator('[data-source="generation"]');
+  await expect(card).toContainText("Odpowiedź źródła");
+  await expect(card).toContainText(source.error);
+});

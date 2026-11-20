@@ -89,10 +89,12 @@ export function Evidence({
               <div>
                 <dt>Sposób dostarczenia</dt>
                 <dd>
-                  {source.error
-                    ? "Źródło niedostępne / zapis archiwalny"
+                  {source.fetchedAt === null
+                    ? "Brak danych ze źródła"
                     : source.cached
-                      ? "Zapis w pamięci podręcznej"
+                      ? source.error
+                        ? "Ostatni dostępny zapis"
+                        : "Zapis w pamięci podręcznej"
                       : "Odpowiedź źródła"}
                 </dd>
               </div>
@@ -112,9 +114,9 @@ export function Evidence({
         <div className="methodology">
           <h3>Jak czytać dashboard</h3>
           <p>
-            <b>Produkcja a zużycie.</b> Miks opisuje publiczną produkcję netto raportowaną przez Energy-Charts, a nie
-            pochodzenie energii w Twoim gniazdku. Zapotrzebowanie jest oddzielnym szeregiem. Nie
-            wymuszamy równości pomiędzy seriami o różnych definicjach.
+            <b>Produkcja a zużycie.</b> Miks opisuje publiczną produkcję netto raportowaną przez
+            Energy-Charts, a nie pochodzenie energii w Twoim gniazdku. Zapotrzebowanie jest
+            oddzielnym szeregiem. Nie wymuszamy równości pomiędzy seriami o różnych definicjach.
           </p>
           <p>
             <b>OZE.</b> Udział w przedziale podaje Energy-Charts. Średnią dla dnia szacujemy z tych
