@@ -189,3 +189,10 @@ let () =
       ) [envelope (List.remove_assoc "rce_pln" row); `Assoc [];
          envelope (("period_utc", `String "18:15 - 19:15") :: List.remove_assoc "period_utc" row);
          envelope (("business_date", `String "2026-10-26") :: List.remove_assoc "business_date" row)])
+
+let () =
+  let row code = `Assoc ["section_code", `String code] in
+  let report codes = `Assoc ["value", `List (List.map row codes)] in
+  check "auxiliary-only flow report cannot replace the cache"
+    (try Store.require_displayed_section "flows" (report ["UA_DOB-PL"]); false with Store.Source_error _ -> true);
+  Store.require_displayed_section "flows" (report ["UA_DOB-PL"; "DE-PL"])
