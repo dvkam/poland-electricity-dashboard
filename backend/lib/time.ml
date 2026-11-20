@@ -3,7 +3,7 @@ let iso seconds =
   | Some time -> Ptime.to_rfc3339 ~frac_s:0 ~tz_offset_s:0 time
   | None -> invalid_arg "Invalid timestamp"
 
-let parse_utc value =
+let parse_time value =
   let value = String.trim value in
   let normalized =
     if String.contains value 'T' then value
@@ -13,8 +13,10 @@ let parse_utc value =
     else value
   in
   match Ptime.of_rfc3339 normalized with
-  | Ok (time, _, _) -> Some (Ptime.to_float_s time)
+  | Ok (time, _, _) -> Some time
   | Error _ -> None
+
+let parse_utc value = Option.map Ptime.to_float_s (parse_time value)
 
 let date_parts date =
   try

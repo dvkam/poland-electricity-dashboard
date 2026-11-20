@@ -38,7 +38,14 @@ let () =
     `Assoc ["dtime_utc", `String "2026-09-13 22:15"; "rce_pln", `Float 10.; "publication_ts_utc", `String "2026-09-13 12:00"];
     `Assoc ["dtime_utc", `String "2026-09-13 22:15"; "rce_pln", `Float 20.; "publication_ts_utc", `String "2026-09-13 13:00"]]] in
   let revision = Normalize.day ~date:"2026-09-14" ~power:`Null ~flows:empty ~prices:revised ~guidance:empty |> List.hd in
-  check "newest publication revision wins" (num (get "rcePlnMwh" revision) = Some 20.)
+  check "newest publication revision wins" (num (get "rcePlnMwh" revision) = Some 20.);
+  let repriced value stamp = `Assoc ["dtime_utc", `String "2026-09-13 22:15";
+    "rce_pln", `Int value; "publication_ts_utc", `String ("2026-09-13 12:00:00." ^ stamp)] in
+  let updates = [repriced 10 "000000001"; repriced 20 "000000002"; repriced 30 "000000002"] in
+  let revised = Normalize.day ~date:"2026-09-14" ~power:`Null ~flows:empty
+    ~prices:(`Assoc ["value", `List updates]) ~guidance:empty |> List.hd in
+  check "subsecond publications use the newest revision and retain the first exact tie"
+    (num (get "rcePlnMwh" revised) = Some 20.)
 
 
 let () =

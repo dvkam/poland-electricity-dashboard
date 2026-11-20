@@ -116,16 +116,18 @@ let power_index power =
   ) times;
   points
 
-let latest_row rows predicate =
-  List.filter predicate rows
-  |> List.sort (fun a b -> Float.compare
-      (Option.value ~default:0. (timestamp "publication_ts_utc" b))
-      (Option.value ~default:0. (timestamp "publication_ts_utc" a)))
-  |> List.find_opt (fun _ -> true)
-
-let row_for_end rows finish =
-  latest_row rows (fun row ->
-    match timestamp "dtime_utc" row with Some value -> abs_float (value -. finish) < 1. | None -> false)
+(* A section can publish several revisions for the same instant. Equal
+   publication times retain the first source row, as in the original stable sort. *)
+let index_revisions report key =
+  let index = Hashtbl.create 128 in
+  List.iter (fun row ->
+    match timestamp "dtime_utc" row, Option.bind (string (field "publication_ts_utc" row)) Time.parse_time with
+    | Some time, Some publication ->
+        Option.iter (fun key -> match Hashtbl.find_opt index key with
+          | Some (previous, _) when Ptime.compare publication previous <= 0 -> ()
+          | _ -> Hashtbl.replace index key (publication, row)) (key time row)
+    | _ -> ()) (list (field "value" report));
+  fun key -> Option.map snd (Hashtbl.find_opt index key)
 
 let border_codes = ["DE"; "CZ"; "SK"; "UA"; "LT"; "SE"]
 
@@ -153,9 +155,11 @@ let day ~date ~power ~flows ~prices ~guidance =
     for quarter = 0 to int_of_float (duration /. 900.) - 1 do
       Hashtbl.replace covered (timestamp + quarter * 900) (value, start, start +. duration)
     done) indexed;
-  let flow_rows = list (field "value" flows)
-  and price_rows = list (field "value" prices)
-  and guidance_rows = list (field "value" guidance) in
+  let flow_at = index_revisions flows (fun time row ->
+    Option.map (fun section -> time, section) (string (field "section_code" row))) in
+  let price_at = index_revisions prices (fun time _ -> Some time) in
+  let guidance_at = index_revisions guidance (fun time row ->
+    if field "is_active" row = `Bool true then Some time else None) in
   Time.slots date |> List.map (fun start ->
     let finish = start +. 900. in
     let (mix, total, renewable, demand, pumping), generation_start, generation_end =
@@ -163,11 +167,8 @@ let day ~date ~power ~flows ~prices ~guidance =
       | Some (point, first, last) -> point, Some first, Some last
       | None -> (List.map (fun (key, _) -> key, None) groups, None, None, None, None), None, None in
     let border_flows = List.map (fun country ->
-      let matching section = latest_row flow_rows (fun row ->
-        string (field "section_code" row) = Some section
-        && (match timestamp "dtime_utc" row with Some value -> abs_float (value -. finish) < 1. | None -> false)) in
-      let incoming = matching (country ^ "-PL") in
-      let outgoing = matching ("PL-" ^ country) in
+      let incoming = flow_at (finish, country ^ "-PL") in
+      let outgoing = flow_at (finish, "PL-" ^ country) in
       let incoming_value = Option.bind incoming (fun row -> number (field "value" row)) in
       let outgoing_value = Option.bind outgoing (fun row -> number (field "value" row)) in
       let net_value = sum [incoming_value; outgoing_value] in
@@ -181,10 +182,8 @@ let day ~date ~power ~flows ~prices ~guidance =
           "exportMw", json_number (Option.map abs_float outgoing_value)])
       | other -> other) border_codes in
     let net = sum (List.map (fun flow -> number (field "signedImportMw" flow)) border_flows) in
-    let price = row_for_end price_rows finish in
-    let advice = latest_row guidance_rows (fun row ->
-      field "is_active" row = `Bool true &&
-      match timestamp "dtime_utc" row with Some value -> value <= start && value +. 3600. > start | None -> false) in
+    let price = price_at finish in
+    let advice = guidance_at (start -. mod_float start 3600.) in
     `Assoc [
       "start", `String (Time.iso start); "end", `String (Time.iso finish);
       "generationStart", json_time generation_start; "generationEnd", json_time generation_end;
