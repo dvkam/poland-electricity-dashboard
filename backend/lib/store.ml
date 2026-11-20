@@ -65,6 +65,15 @@ let validate ~date id payload =
       | _ -> raise (Source_error "Odpowiedź źródła nie zawiera serii produkcji."))
   | _ -> raise (Source_error "Odpowiedź źródła ma niezgodny format.")
 
+let require_displayed_section id payload =
+  if id = "flows" then begin
+    let displayed row = match Normalize.string (Normalize.field "section_code" row) with
+      | Some code -> List.exists (fun border -> code = border ^ "-PL" || code = "PL-" ^ border) Normalize.border_codes
+      | None -> false in
+    if not (List.exists displayed (Normalize.list (Normalize.field "value" payload))) then
+      raise (Source_error "Raport PSE nie zawiera danych o wyświetlanych granicach.")
+  end
+
 let persist persist_fn payload fetched_at =
   try persist_fn payload fetched_at; None with exn ->
     prerr_endline ("Cache write failed: " ^ Printexc.to_string exn);
@@ -129,7 +138,7 @@ let get_with ~directory ~fetch ~date ~id ~url =
   Lwt_mutex.with_lock (lock key) (fun () ->
     let path = Filename.concat directory (key ^ ".json") in
     let previous = Option.bind (read path) (fun (payload, t) ->
-      try validate ~date id payload; Some (payload, t) with Source_error _ -> None) in
+      try validate ~date id payload; require_displayed_section id payload; Some (payload, t) with Source_error _ -> None) in
     let now = Unix.gettimeofday () in
     let ttl = cache_ttl ~date ~now in
     match previous with
@@ -138,6 +147,7 @@ let get_with ~directory ~fetch ~date ~id ~url =
     | _ ->
         Lwt.catch
           (fun () -> paginated ~fetch ~date ~id url >|= fun payload ->
+            require_displayed_section id payload;
             let fetched_at = Unix.gettimeofday () in
             let error = persist (save path) payload fetched_at in
             {payload; fetched_at=Some fetched_at; cached=false; error; url; id})
