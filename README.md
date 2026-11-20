@@ -94,7 +94,7 @@ Open http://127.0.0.1:8088. Nginx serves the frontend and forwards API requests 
 | [PSE reports](https://api.raporty.pse.pl/)                      | `/api/rce-pln`                | RCE in PLN/MWh                                            |
 | [PSE reports](https://api.raporty.pse.pl/)                      | `/api/pdgsz`                  | Active Energetyczny Kompas guidance                       |
 
-Energy-Charts provides public net production based on ENTSO-E data. Generation totals exclude load, trade and storage consumption. Storage discharge is included in total generation and excluded from renewable generation. The historical source inventory can omit offshore wind and batteries; explicit null readings remain unknown.
+Energy-Charts provides public net production based on ENTSO-E data. Generation totals exclude load, trade and storage consumption. Total generation includes storage discharge. The interval renewable share comes from Energy-Charts. The daily estimate weights the published, rounded percentages by generation energy excluding storage discharge. The historical source inventory can omit offshore wind and batteries; explicit null readings remain unknown.
 
 PSE flow values describe physical exchange. The backend combines both directions for each border. The national net requires complete coverage of all six borders. These flows do not identify the origin of electricity consumed in a home.
 

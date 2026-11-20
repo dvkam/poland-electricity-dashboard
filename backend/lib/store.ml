@@ -135,17 +135,7 @@ let source_json resource =
     "error", (match resource.error with Some value -> `String value | None -> `Null)
   ]
 
-let load_day date =
-  let pse report extra = "https://api.raporty.pse.pl/api/" ^ report
-    ^ "?$filter=" ^ Uri.pct_encode ("business_date eq '" ^ date ^ "'" ^ extra)
-    ^ "&$first=500" in
-  let requests = [
-    ("generation", "https://api.energy-charts.info/v2/public_power?country=pl&start=" ^ date ^ "&end=" ^ date);
-    ("flows", pse "przeplywy-mocy" "");
-    ("prices", pse "rce-pln" "");
-    ("guidance", pse "pdgsz" " and is_active eq true")
-  ] in
-  Lwt_list.map_p (fun (id, url) -> get ~date ~id ~url) requests >|= fun resources ->
+let day_response date resources =
   let payload id = match List.find_opt (fun r -> r.id = id) resources with Some r -> r.payload | None -> `Null in
   let power = match payload "generation" with `Null -> `Null | p -> Normalize.public_power_v2 p in
   let points = Normalize.day ~date ~power ~flows:(payload "flows")
@@ -156,3 +146,15 @@ let load_day date =
     "sources", `List (List.map source_json resources);
     "points", `List points
   ]
+
+let load_day date =
+  let pse report extra = "https://api.raporty.pse.pl/api/" ^ report
+    ^ "?$filter=" ^ Uri.pct_encode ("business_date eq '" ^ date ^ "'" ^ extra)
+    ^ "&$first=500" in
+  let requests = [
+    ("generation", "https://api.energy-charts.info/v2/public_power?country=pl&start=" ^ date ^ "&end=" ^ date);
+    ("flows", pse "przeplywy-mocy" "");
+    ("prices", pse "rce-pln" "");
+    ("guidance", pse "pdgsz" " and is_active eq true")
+  ] in
+  Lwt_list.map_p (fun (id, url) -> get ~date ~id ~url) requests >|= day_response date

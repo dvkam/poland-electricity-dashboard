@@ -160,9 +160,12 @@ export function renewableEnergyShare(points: readonly Point[]): number | null {
   let total = 0;
   for (const point of points) {
     if (point.generationMw === null || point.renewablePercent === null) continue;
+    const storage = point.generation.storage;
+    if (storage === null || point.generationMw <= storage) continue;
+    const generation = point.generationMw - storage;
     const hours = (Date.parse(point.end) - Date.parse(point.start)) / 3_600_000;
-    total += point.generationMw * hours;
-    renewable += ((point.generationMw * point.renewablePercent) / 100) * hours;
+    total += generation * hours;
+    renewable += ((generation * point.renewablePercent) / 100) * hours;
   }
   return total > 0 ? (renewable / total) * 100 : null;
 }

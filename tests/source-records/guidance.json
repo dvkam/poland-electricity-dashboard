@@ -1,0 +1,16 @@
+{
+  "value": [
+    {
+      "dtime": "2026-10-25 20:00",
+      "dtime_utc": "2026-10-25 19:00",
+      "is_active": true,
+      "usage_fcst": 1,
+      "valid_to_ts": null,
+      "business_date": "2026-10-25",
+      "valid_from_ts": "2026-10-25 22:35:03.542",
+      "publication_ts": "2026-10-25 22:35:03.542",
+      "publication_ts_utc": "2026-10-25 21:35:03.542",
+      "total_power_demand": null
+    }
+  ]
+}

@@ -1,3 +1,9 @@
 (test
  (name test_grid)
+ (modules test_grid)
  (libraries grid unix yojson))
+
+(executable
+ (name replay_day)
+ (modules replay_day)
+ (libraries grid yojson))

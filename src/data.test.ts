@@ -57,8 +57,18 @@ describe("electricity data semantics", () => {
   it("weights the renewable share by energy, not average percentages", () => {
     expect(
       renewableEnergyShare([
-        { ...empty, generationMw: 100, renewablePercent: 100 },
-        { ...empty, generationMw: 300, renewablePercent: 0 },
+        {
+          ...empty,
+          generation: { ...empty.generation, storage: 50 },
+          generationMw: 150,
+          renewablePercent: 100,
+        },
+        {
+          ...empty,
+          generation: { ...empty.generation, storage: 0 },
+          generationMw: 300,
+          renewablePercent: 0,
+        },
       ]),
     ).toBe(25);
   });

@@ -117,9 +117,8 @@ export function Evidence({
             wymuszamy równości pomiędzy seriami o różnych definicjach.
           </p>
           <p>
-            <b>OZE.</b> Sumujemy wiatr, słońce, naturalną hydroenergetykę, biomasę i inne
-            raportowane odnawialne źródła. Dzielimy przez sumę raportowanej produkcji. Produkcja
-            elektrowni szczytowo-pompowych i baterii nie jest automatycznie odnawialna.
+            <b>OZE.</b> Udział w przedziale podaje Energy-Charts. Średnią dla dnia szacujemy z tych
+            zaokrąglonych udziałów, ważąc je energią z produkcji bez rozładowania magazynów.
           </p>
           <p>
             <b>Granice.</b> Saldo to suma sześciu fizycznych przekrojów PSE dla tego samego

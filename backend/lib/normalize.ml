@@ -67,9 +67,8 @@ let power_index power =
             then "Battery" :: names else names in
           key, sum (List.map get names)) groups in
         let total = sum (List.map snd mix) in
-        let renewable = sum (List.map get ["Solar"; "Wind onshore"; "Wind offshore";
-          "Hydro Run-of-River"; "Hydro water reservoir"; "Biomass"; "Other renewables"]) in
-        let share = match renewable, total with Some r, Some t when t > 0. -> Some (r /. t *. 100.) | _ -> None in
+        let share = match get "Renewable share of generation" with
+          | Some n when n >= 0. && n <= 100. -> Some n | _ -> None in
         Hashtbl.replace points (int_of_float start) (mix, total, share, get "Load", get "Hydro pumped storage consumption")
   ) times;
   points

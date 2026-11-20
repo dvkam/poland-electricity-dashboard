@@ -1,0 +1,136 @@
+{
+  "value": [
+    {
+      "dtime": "2026-10-25 20:15:00",
+      "value": 0.0,
+      "period": "20:00 - 20:15",
+      "dtime_utc": "2026-10-25 19:15:00",
+      "period_utc": "19:00 - 19:15",
+      "section_code": "CZ-PL",
+      "business_date": "2026-10-25",
+      "publication_ts": "2026-10-26 01:18:12.403",
+      "publication_ts_utc": "2026-10-26 00:18:12.403"
+    },
+    {
+      "dtime": "2026-10-25 20:15:00",
+      "value": 1866.5,
+      "period": "20:00 - 20:15",
+      "dtime_utc": "2026-10-25 19:15:00",
+      "period_utc": "19:00 - 19:15",
+      "section_code": "DE-PL",
+      "business_date": "2026-10-25",
+      "publication_ts": "2026-10-26 01:18:12.403",
+      "publication_ts_utc": "2026-10-26 00:18:12.403"
+    },
+    {
+      "dtime": "2026-10-25 20:15:00",
+      "value": 246.3,
+      "period": "20:00 - 20:15",
+      "dtime_utc": "2026-10-25 19:15:00",
+      "period_utc": "19:00 - 19:15",
+      "section_code": "LT-PL",
+      "business_date": "2026-10-25",
+      "publication_ts": "2026-10-26 01:18:12.403",
+      "publication_ts_utc": "2026-10-26 00:18:12.403"
+    },
+    {
+      "dtime": "2026-10-25 20:15:00",
+      "value": -1498.4,
+      "period": "20:00 - 20:15",
+      "dtime_utc": "2026-10-25 19:15:00",
+      "period_utc": "19:00 - 19:15",
+      "section_code": "PL-CZ",
+      "business_date": "2026-10-25",
+      "publication_ts": "2026-10-26 01:18:12.403",
+      "publication_ts_utc": "2026-10-26 00:18:12.403"
+    },
+    {
+      "dtime": "2026-10-25 20:15:00",
+      "value": 0.0,
+      "period": "20:00 - 20:15",
+      "dtime_utc": "2026-10-25 19:15:00",
+      "period_utc": "19:00 - 19:15",
+      "section_code": "PL-DE",
+      "business_date": "2026-10-25",
+      "publication_ts": "2026-10-26 01:18:12.403",
+      "publication_ts_utc": "2026-10-26 00:18:12.403"
+    },
+    {
+      "dtime": "2026-10-25 20:15:00",
+      "value": 0.0,
+      "period": "20:00 - 20:15",
+      "dtime_utc": "2026-10-25 19:15:00",
+      "period_utc": "19:00 - 19:15",
+      "section_code": "PL-LT",
+      "business_date": "2026-10-25",
+      "publication_ts": "2026-10-26 01:18:12.403",
+      "publication_ts_utc": "2026-10-26 00:18:12.403"
+    },
+    {
+      "dtime": "2026-10-25 20:15:00",
+      "value": 0.0,
+      "period": "20:00 - 20:15",
+      "dtime_utc": "2026-10-25 19:15:00",
+      "period_utc": "19:00 - 19:15",
+      "section_code": "PL-SE",
+      "business_date": "2026-10-25",
+      "publication_ts": "2026-10-26 01:18:12.403",
+      "publication_ts_utc": "2026-10-26 00:18:12.403"
+    },
+    {
+      "dtime": "2026-10-25 20:15:00",
+      "value": -583.4,
+      "period": "20:00 - 20:15",
+      "dtime_utc": "2026-10-25 19:15:00",
+      "period_utc": "19:00 - 19:15",
+      "section_code": "PL-SK",
+      "business_date": "2026-10-25",
+      "publication_ts": "2026-10-26 01:18:12.403",
+      "publication_ts_utc": "2026-10-26 00:18:12.403"
+    },
+    {
+      "dtime": "2026-10-25 20:15:00",
+      "value": -330.3,
+      "period": "20:00 - 20:15",
+      "dtime_utc": "2026-10-25 19:15:00",
+      "period_utc": "19:00 - 19:15",
+      "section_code": "PL-UA",
+      "business_date": "2026-10-25",
+      "publication_ts": "2026-10-26 01:18:12.403",
+      "publication_ts_utc": "2026-10-26 00:18:12.403"
+    },
+    {
+      "dtime": "2026-10-25 20:15:00",
+      "value": 148.7,
+      "period": "20:00 - 20:15",
+      "dtime_utc": "2026-10-25 19:15:00",
+      "period_utc": "19:00 - 19:15",
+      "section_code": "SE-PL",
+      "business_date": "2026-10-25",
+      "publication_ts": "2026-10-26 01:18:12.403",
+      "publication_ts_utc": "2026-10-26 00:18:12.403"
+    },
+    {
+      "dtime": "2026-10-25 20:15:00",
+      "value": 0.0,
+      "period": "20:00 - 20:15",
+      "dtime_utc": "2026-10-25 19:15:00",
+      "period_utc": "19:00 - 19:15",
+      "section_code": "SK-PL",
+      "business_date": "2026-10-25",
+      "publication_ts": "2026-10-26 01:18:12.403",
+      "publication_ts_utc": "2026-10-26 00:18:12.403"
+    },
+    {
+      "dtime": "2026-10-25 20:15:00",
+      "value": 0.0,
+      "period": "20:00 - 20:15",
+      "dtime_utc": "2026-10-25 19:15:00",
+      "period_utc": "19:00 - 19:15",
+      "section_code": "UA-PL",
+      "business_date": "2026-10-25",
+      "publication_ts": "2026-10-26 01:18:12.403",
+      "publication_ts_utc": "2026-10-26 00:18:12.403"
+    }
+  ]
+}

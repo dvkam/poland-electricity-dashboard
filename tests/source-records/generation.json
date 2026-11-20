@@ -1,0 +1,137 @@
+{
+  "schema_version": "2.0",
+  "endpoint": "public_power",
+  "country": "pl",
+  "bidding_zone": null,
+  "timezone": "Europe/Warsaw",
+  "resolution": "PT15M",
+  "interval_minutes": 15,
+  "unit": "MW",
+  "generated_at": "2026-10-26T23:57:29+01:00",
+  "available_from": "2026-10-25T00:00:00+02:00",
+  "available_until": "2026-10-25T23:45:00+01:00",
+  "series": [
+    {
+      "id": "hydro_pumped_storage_consumption",
+      "name": "Hydro pumped storage consumption"
+    },
+    {
+      "id": "battery_consumption",
+      "name": "Battery Consumption"
+    },
+    {
+      "id": "cross_border_electricity_trading",
+      "name": "Cross border electricity trading"
+    },
+    {
+      "id": "hydro_run_of_river",
+      "name": "Hydro Run-of-River"
+    },
+    {
+      "id": "biomass",
+      "name": "Biomass"
+    },
+    {
+      "id": "fossil_brown_coal_lignite",
+      "name": "Fossil brown coal / lignite"
+    },
+    {
+      "id": "fossil_hard_coal",
+      "name": "Fossil hard coal"
+    },
+    {
+      "id": "fossil_oil",
+      "name": "Fossil oil"
+    },
+    {
+      "id": "fossil_coal_derived_gas",
+      "name": "Fossil coal-derived gas"
+    },
+    {
+      "id": "fossil_gas",
+      "name": "Fossil gas"
+    },
+    {
+      "id": "hydro_water_reservoir",
+      "name": "Hydro water reservoir"
+    },
+    {
+      "id": "hydro_pumped_storage",
+      "name": "Hydro pumped storage"
+    },
+    {
+      "id": "battery",
+      "name": "Battery"
+    },
+    {
+      "id": "others",
+      "name": "Others"
+    },
+    {
+      "id": "other_renewables",
+      "name": "Other renewables"
+    },
+    {
+      "id": "wind_offshore",
+      "name": "Wind offshore"
+    },
+    {
+      "id": "wind_onshore",
+      "name": "Wind onshore"
+    },
+    {
+      "id": "solar",
+      "name": "Solar"
+    },
+    {
+      "id": "load",
+      "name": "Load"
+    },
+    {
+      "id": "residual_load",
+      "name": "Residual load"
+    },
+    {
+      "id": "renewable_share_of_load",
+      "name": "Renewable share of load",
+      "unit": "%"
+    },
+    {
+      "id": "renewable_share_of_generation",
+      "name": "Renewable share of generation",
+      "unit": "%"
+    }
+  ],
+  "data": [
+    {
+      "timestamp": "2026-10-25T20:00:00+01:00",
+      "values": {
+        "hydro_pumped_storage_consumption": -3.6,
+        "battery_consumption": -0.0,
+        "cross_border_electricity_trading": -205.0,
+        "hydro_run_of_river": 64.3,
+        "biomass": 374.0,
+        "fossil_brown_coal_lignite": 2536.0,
+        "fossil_hard_coal": 5336.2,
+        "fossil_oil": 202.1,
+        "fossil_coal_derived_gas": 187.7,
+        "fossil_gas": 1396.3,
+        "hydro_water_reservoir": 215.3,
+        "hydro_pumped_storage": 876.9,
+        "battery": 0.0,
+        "others": 547.7,
+        "other_renewables": 81.1,
+        "wind_offshore": 393.2,
+        "wind_onshore": 6190.1,
+        "solar": 0.0,
+        "load": 18222.0,
+        "residual_load": 11638.6,
+        "renewable_share_of_load": 40.2,
+        "renewable_share_of_generation": 41.8
+      }
+    }
+  ],
+  "attributes": {},
+  "license": "CC BY 4.0 (creativecommons.org/licenses/by/4.0), attribution: energy-charts.info",
+  "deprecated": false
+}

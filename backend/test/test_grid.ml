@@ -71,7 +71,7 @@ let () =
       series "Renewable share of generation" 77.])] in
   let first = Normalize.day ~date:"2026-09-14" ~power ~flows:empty ~prices:empty ~guidance:empty |> List.hd in
   check "generation excludes load, pumping, trade and percentage series" (num (get "generationMw" first) = Some 1400.);
-  check "storage discharge is excluded from renewable numerator" (num (get "renewablePercent" first) = Some 50.);
+  check "interval KPI uses the published percentage" (num (get "renewablePercent" first) = Some 77.);
   check "reported load remains independent" (num (get "demandMw" first) = Some 1800.);
   check "pumping demand is displayed as a positive magnitude" (num (get "pumpingMw" first) = Some 80.)
 
@@ -112,8 +112,8 @@ let () =
   let mix, total, renewable, _, _ = point (`Float 500.) in
   check "battery discharge included in storage" (List.assoc "storage" mix = Some 600.);
   check "battery consumption excluded from generation" (total = Some 1900.);
-  check "battery discharge excluded from renewables"
-    (match renewable with Some share -> abs_float (share -. 700. /. 1900. *. 100.) < 0.001 | None -> false);
+  check "unpublished renewable share stays unknown"
+    (renewable = None);
   let _, unknown, _, _, _ = point `Null in
   check "unknown battery output is not treated as zero" (unknown = None)
 
