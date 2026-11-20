@@ -18,6 +18,15 @@ let parse_time value =
 
 let parse_utc value = Option.map Ptime.to_float_s (parse_time value)
 
+(* Publication timestamps identify revisions. Retain source fractions when
+   converting them to UTC, including revisions published within one second. *)
+let publication_utc value = Option.map (fun t ->
+  let full = Ptime.to_rfc3339 ~frac_s:12 ~tz_offset_s:0 t in
+  let rec trim i = if full.[i] = '0' then trim (i - 1) else i in
+  let last = trim (String.length full - 2) in
+  String.sub full 0 (if full.[last] = '.' then last else last + 1) ^ "Z"
+) (parse_time value)
+
 let date_parts date =
   try
     if String.length date <> 10 || date.[4] <> '-' || date.[7] <> '-'

@@ -1,6 +1,11 @@
 import { ArrowDownLeft, ArrowUpRight, MoveUpRight } from "lucide-react";
-import { numberLabel, timeLabel } from "./data";
+import { intervalLabel, numberLabel, timeLabel } from "./data";
+import "./flows.css";
 import type { Point } from "./data";
+const flowNumber = new Intl.NumberFormat("pl-PL", {
+  maximumFractionDigits: 3,
+  signDisplay: "exceptZero",
+});
 const countries = [
   { code: "SE", name: "Szwecja", x: 128, y: 45 },
   { code: "LT", name: "Litwa", x: 355, y: 45 },
@@ -144,6 +149,40 @@ export function FlowMap({
         </span>
         <span>MW · {point ? timeLabel(point.start) : "—"}</span>
       </div>
+      <details className="border-readings">
+        <summary>Tabela przepływów na granicach</summary>
+        <table>
+          <caption>Saldo dla Polski{point ? " · " + intervalLabel(point) : ""}</caption>
+          <thead>
+            <tr>
+              <th scope="col">Kraj</th>
+              <th scope="col">Saldo (MW)</th>
+              <th scope="col">Kierunek netto</th>
+            </tr>
+          </thead>
+          <tbody>
+            {countries.map(({ code, name }) => {
+              const value =
+                point?.flows.find((flow) => flow.country === code)?.signedImportMw ?? null;
+              const direction =
+                value === null
+                  ? "Brak danych"
+                  : value > 0
+                    ? "Import"
+                    : value < 0
+                      ? "Eksport"
+                      : "Zbilansowany";
+              return (
+                <tr key={code}>
+                  <th scope="row">{name}</th>
+                  <td>{value === null ? "—" : flowNumber.format(value)}</td>
+                  <td>{direction}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </details>
       <p className="chart-footnote">
         Przepływy fizyczne, nie umowy handlowe. Schemat połączeń; brak odczytu nie oznacza zera.
       </p>

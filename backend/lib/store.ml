@@ -237,6 +237,8 @@ let source_json resource =
     "id", `String resource.id; "name", `String name; "url", `String home;
     "endpoint", `String resource.url; "note", `String note;
     "fetchedAt", Normalize.json_time resource.fetched_at;
+    "providerGeneratedAt", (if resource.id = "generation"
+      then Normalize.publication_time "generated_at" resource.payload else `Null);
     "cached", `Bool resource.cached;
     "error", (match resource.error with Some value -> `String value | None -> `Null)
   ]

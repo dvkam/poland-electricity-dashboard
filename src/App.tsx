@@ -16,6 +16,7 @@ import {
   Sun,
   Zap,
 } from "lucide-react";
+import { downloadCsv } from "./exportDay";
 import { Evidence } from "./Evidence";
 import { FlowMap } from "./FlowMap";
 import { Timeline } from "./Timeline";
@@ -40,43 +41,6 @@ import {
 } from "./data";
 import type { Day, Point, SourceId, Tariff } from "./data";
 
-function downloadCsv(day: Day) {
-  const headings = [
-    "start_utc",
-    "end_utc",
-    "generation_start_utc",
-    "generation_end_utc",
-    "generation_mw",
-    "demand_mw",
-    "renewable_percent",
-    "net_physical_import_mw",
-    "rce_pln_mwh",
-  ];
-  const rows = day.points.map((p) =>
-    [
-      p.start,
-      p.end,
-      p.generationStart,
-      p.generationEnd,
-      p.generationMw,
-      p.demandMw,
-      p.renewablePercent,
-      p.netImportMw,
-      p.rcePlnMwh,
-    ]
-      .map((value) => value ?? "")
-      .join(","),
-  );
-  const blob = new Blob([headings.join(",") + "\n" + rows.join("\n")], {
-    type: "text/csv;charset=utf-8",
-  });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = "prad-polski-" + day.date + ".csv";
-  anchor.click();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 function Stat({
   title,
   value,
@@ -559,7 +523,7 @@ export function App() {
                 </span>
               </div>
               <button type="button" className="secondary-button" onClick={() => downloadCsv(data)}>
-                <ArrowDownToLine size={16} /> Pobierz CSV
+                <ArrowDownToLine size={16} /> Pobierz CSV ze szczegółami
               </button>
               <button type="button" className="text-link" onClick={() => evidence()}>
                 Sprawdź metodologię <ArrowUpRight size={15} />

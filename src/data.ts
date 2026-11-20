@@ -14,6 +14,7 @@ export const fuels = [
   { key: "other", label: "Pozostałe", short: "Inne", color: "#c4cbd3" },
 ] as const;
 export type Fuel = (typeof fuels)[number]["key"];
+export const borderCodes = ["DE", "CZ", "SK", "UA", "LT", "SE"] as const;
 export const sourceSchema = z.object({
   id: z.enum(["generation", "flows", "prices", "guidance"]),
   name: z.string(),
@@ -21,6 +22,7 @@ export const sourceSchema = z.object({
   endpoint: z.string().url(),
   note: z.string(),
   fetchedAt: timestamp.nullable(),
+  providerGeneratedAt: timestamp.nullable().optional(),
   cached: z.boolean(),
   error: z.string().nullable(),
 });
@@ -47,11 +49,15 @@ export const pointSchema = z.object({
   netImportMw: nullableNumber,
   flows: z.array(
     z.object({
-      country: z.enum(["DE", "CZ", "SK", "UA", "LT", "SE"]),
+      country: z.enum(borderCodes),
       from: z.string(),
       to: z.string(),
       mw: nullableNumber,
       signedImportMw: nullableNumber,
+      importMw: nullableNumber.optional(),
+      exportMw: nullableNumber.optional(),
+      importPublishedAt: timestamp.nullable().optional(),
+      exportPublishedAt: timestamp.nullable().optional(),
       kind: z.literal("physical"),
       publishedAt: timestamp.nullable(),
     }),

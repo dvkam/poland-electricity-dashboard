@@ -8,6 +8,8 @@ let list = function `List values -> values | _ -> []
 let json_number = function Some value -> `Float value | None -> `Null
 let json_time = function Some value -> `String (Time.iso value) | None -> `Null
 let timestamp key row = Option.bind (string (field key row)) Time.parse_utc
+let publication_time key row = match Option.bind (string (field key row)) Time.publication_utc with
+  | Some utc -> `String utc | None -> `Null
 
 let sum values =
   if List.exists Option.is_none values then None
@@ -178,6 +180,8 @@ let day ~date ~power ~flows ~prices ~guidance =
         "value", `Float value; "publication_ts_utc", json_time publication]) net_value in
       match flow_json country row with
       | `Assoc fields -> `Assoc (fields @ [
+          "importPublishedAt", Option.fold ~none:`Null ~some:(publication_time "publication_ts_utc") incoming;
+          "exportPublishedAt", Option.fold ~none:`Null ~some:(publication_time "publication_ts_utc") outgoing;
           "importMw", json_number incoming_value;
           "exportMw", json_number (Option.map abs_float outgoing_value)])
       | other -> other) border_codes in
@@ -193,8 +197,8 @@ let day ~date ~power ~flows ~prices ~guidance =
       "pumpingMw", json_number (Option.map abs_float pumping);
       "netImportMw", json_number net; "flows", `List border_flows;
       "rcePlnMwh", json_number (Option.bind price (fun row -> number (field "rce_pln" row)));
-      "pricePublishedAt", json_time (Option.bind price (timestamp "publication_ts_utc"));
+      "pricePublishedAt", Option.fold ~none:`Null ~some:(publication_time "publication_ts_utc") price;
       "guidance", (match Option.bind advice (fun row -> number (field "usage_fcst" row)) with
         | Some n when n >= 0. && n <= 3. && Float.floor n = n -> `Int (int_of_float n) | _ -> `Null);
-      "guidancePublishedAt", json_time (Option.bind advice (timestamp "publication_ts_utc"))
+      "guidancePublishedAt", Option.fold ~none:`Null ~some:(publication_time "publication_ts_utc") advice
     ])
