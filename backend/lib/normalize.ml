@@ -10,6 +10,7 @@ let json_time = function Some value -> `String (Time.iso value) | None -> `Null
 let timestamp key row = Option.bind (string (field key row)) Time.parse_utc
 let publication_time key row = match Option.bind (string (field key row)) Time.publication_utc with
   | Some utc -> `String utc | None -> `Null
+let publication_instant row = Option.bind (string (field "publication_ts_utc" row)) Time.parse_time
 
 let sum values =
   if List.exists Option.is_none values then None
@@ -56,13 +57,27 @@ let public_power_v2 ~date payload =
     | Some bounds -> bounds | None -> invalid_arg "Invalid generation date" in
   let duration = Option.get minutes *. 60. in
   let rows = list (field "data" payload) in
+  let mapping = production_ids @ auxiliary_ids in
   let ids = list (field "series" payload) |> List.map (fun entry ->
-    match string (field "id" entry) with Some id when id <> "" -> id | _ -> invalid_arg "Missing series id") in
+    match string (field "id" entry) with
+    | Some id when id <> "" ->
+        let expected = match id with
+          | "renewable_share_of_generation" | "renewable_share_of_load" -> "%"
+          | _ -> "MW" in
+        let unit = match field "unit" entry with `Null -> field "unit" payload | u -> u in
+        if List.mem_assoc id mapping && unit <> `String expected then invalid_arg "Unexpected series unit";
+        id
+    | _ -> invalid_arg "Missing series id") in
   let sorted_ids = List.sort String.compare ids in
   if ids = [] || sorted_ids <> List.sort_uniq String.compare ids then invalid_arg "Invalid series inventory";
   let seen = Hashtbl.create 100 in
   let times = List.map (fun row ->
-    let t = match timestamp "timestamp" row with
+    let instant = match string (field "timestamp" row) with
+      | Some value -> (match Ptime.of_rfc3339 value with
+          | Ok (t, Some _, _) when Ptime.equal t (Ptime.truncate ~frac_s:0 t) -> Some (Ptime.to_float_s t)
+          | _ -> None)
+      | None -> None in
+    let t = match instant with
       | Some t when t >= first && t +. duration <= last && mod_float (t -. first) duration = 0.
                     && not (Hashtbl.mem seen t) -> t
       | _ -> invalid_arg "Invalid or repeated generation interval" in
@@ -72,7 +87,6 @@ let public_power_v2 ~date payload =
                        && List.for_all (fun (_, v) -> v = `Null || Option.is_some (number v)) fields -> ()
      | _ -> invalid_arg "Invalid generation measurements");
     t) rows in
-  let mapping = production_ids @ auxiliary_ids in
   let series = List.filter_map (fun id -> Option.map (fun name ->
     `Assoc ["name", `String name; "data", `List (List.map (fun row -> field id (field "values" row)) rows)]
   ) (List.assoc_opt id mapping)) ids in
@@ -123,7 +137,7 @@ let power_index power =
 let index_revisions report key =
   let index = Hashtbl.create 128 in
   List.iter (fun row ->
-    match timestamp "dtime_utc" row, Option.bind (string (field "publication_ts_utc" row)) Time.parse_time with
+    match timestamp "dtime_utc" row, publication_instant row with
     | Some time, Some publication ->
         Option.iter (fun key -> match Hashtbl.find_opt index key with
           | Some (previous, _) when Ptime.compare publication previous <= 0 -> ()
@@ -144,7 +158,7 @@ let flow_json country row =
     "country", `String country; "from", `String from_; "to", `String to_;
     "mw", json_number (Option.map abs_float value);
     "signedImportMw", json_number value; "kind", `String "physical";
-    "publishedAt", json_time (Option.bind row (timestamp "publication_ts_utc"))
+    "publishedAt", Option.fold ~none:`Null ~some:(publication_time "publication_ts_utc") row
   ]
 
 let day ~date ~power ~flows ~prices ~guidance =
@@ -174,10 +188,10 @@ let day ~date ~power ~flows ~prices ~guidance =
       let incoming_value = Option.bind incoming (fun row -> number (field "value" row)) in
       let outgoing_value = Option.bind outgoing (fun row -> number (field "value" row)) in
       let net_value = sum [incoming_value; outgoing_value] in
-      let publication = List.filter_map (fun row -> Option.bind row (timestamp "publication_ts_utc")) [incoming; outgoing]
-        |> List.sort Float.compare |> List.rev |> List.find_opt (fun _ -> true) in
+      let latest = if Option.compare Ptime.compare (Option.bind incoming publication_instant)
+        (Option.bind outgoing publication_instant) >= 0 then incoming else outgoing in
       let row = Option.map (fun value -> `Assoc [
-        "value", `Float value; "publication_ts_utc", json_time publication]) net_value in
+        "value", `Float value; "publication_ts_utc", Option.fold ~none:`Null ~some:(field "publication_ts_utc") latest]) net_value in
       match flow_json country row with
       | `Assoc fields -> `Assoc (fields @ [
           "importPublishedAt", Option.fold ~none:`Null ~some:(publication_time "publication_ts_utc") incoming;

@@ -235,6 +235,8 @@ let () =
           (result.cached && Option.is_some result.error && result.payload = previous
            && Store.read path = Some (previous, 1.) && Array.length (Sys.readdir dir) = 2))
         ["wrong country", replace "country" (`String "de"); "wrong endpoint", replace "endpoint" (`String "price");
+         "wrong per-series unit", replace "series" (`List [`Assoc ["id", `String "load"; "unit", `String "GW"]]);
+         "ambiguous autumn time", payload [`Assoc ["timestamp", `String "2026-10-25 02:00"; "values", values `Null]];
          "wrong unit", replace "unit" (`String "GW"); "conflicting resolution", replace "resolution" (`String "PT1H");
          "other day", payload [row last (values `Null)]; "off-grid time", payload [row (first +. 1.) (values `Null)];
          "duplicate instant", payload [good_row; good_row]; "missing measurements", payload [row first `Null];
