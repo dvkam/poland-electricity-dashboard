@@ -13,7 +13,9 @@ export function useDay(date: string) {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 60_000);
     let active = true;
+    let nextPoll: number | undefined;
     async function load() {
+      let delay = 300_000;
       try {
         const response = await fetch("/api/v1/day?date=" + encodeURIComponent(date), {
           signal: controller.signal,
@@ -26,6 +28,7 @@ export function useDay(date: string) {
           throw new Error(
             "Odpowiedź źródła ma nieoczekiwany format. Dane nie zostały wyświetlone.",
           );
+        if (parsed.data.sources.some((source) => source.revalidating)) delay = 5_000;
         if (active) setResult({ key, data: parsed.data, error: null });
       } catch (caught) {
         const error =
@@ -35,6 +38,7 @@ export function useDay(date: string) {
         if (active) setResult((previous) => ({ key, data: previous?.data ?? null, error }));
       } finally {
         window.clearTimeout(timeout);
+        if (active) nextPoll = window.setTimeout(refresh, delay);
       }
     }
     void load();
@@ -42,12 +46,9 @@ export function useDay(date: string) {
       active = false;
       controller.abort();
       window.clearTimeout(timeout);
+      window.clearTimeout(nextPoll);
     };
-  }, [date, key]);
-  useEffect(() => {
-    const id = window.setInterval(refresh, 300_000);
-    return () => window.clearInterval(id);
-  }, [refresh]);
+  }, [date, key, refresh]);
   return {
     data: result?.data?.date === date ? result.data : null,
     loading: result?.key !== key,
