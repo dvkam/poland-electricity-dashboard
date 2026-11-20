@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import {
   Activity,
   ArrowDownToLine,
@@ -13,11 +13,11 @@ import {
   PlugZap,
   RefreshCw,
   ShieldCheck,
-  Sun,
   Zap,
 } from "lucide-react";
 import { downloadCsv } from "./exportDay";
 import { Evidence } from "./Evidence";
+import { DailySummary } from "./DailySummary";
 import { FlowMap } from "./FlowMap";
 import { Timeline } from "./Timeline";
 import { PriceChart } from "./PriceChart";
@@ -28,18 +28,15 @@ import {
   fullTime,
   intervalLabel,
   generationIntervalLabel,
-  completedGeneration,
   fuels,
   latestIndex,
   numberLabel,
   observationState,
-  renewableEnergyShare,
   shiftDate,
   tariffCopy,
-  timeLabel,
   today,
 } from "./data";
-import type { Day, Point, SourceId, Tariff } from "./data";
+import type { Point, SourceId, Tariff } from "./data";
 
 function Stat({
   title,
@@ -118,77 +115,6 @@ function Mix({ point }: { point: Point | undefined }) {
         Magazyny: produkcja elektrowni szczytowo-pompowych i baterii. Pobór na pompowanie:{" "}
         {numberLabel(point?.pumpingMw ?? null, 0)} MW.
       </p>
-    </section>
-  );
-}
-function Stories({ day, now }: { day: Day; now: number }) {
-  const complete = day.points.filter((point) => completedGeneration(point, now));
-  const solarPeak = complete.reduce<Point | undefined>(
-    (best, point) =>
-      (point.generation.solar ?? -1) > (best?.generation.solar ?? -1) ? point : best,
-    undefined,
-  );
-  const prices = day.points.filter((point) => point.rcePlnMwh !== null);
-  const cheapest = prices.reduce<Point | undefined>(
-    (best, point) => ((point.rcePlnMwh ?? Infinity) < (best?.rcePlnMwh ?? Infinity) ? point : best),
-    undefined,
-  );
-  const share = renewableEnergyShare(complete);
-  return (
-    <section className="stories-section" aria-labelledby="stories-heading">
-      <div className="section-title">
-        <h2 id="stories-heading">Ten dzień w trzech zdaniach</h2>
-        <span>Z dostępnych danych · bez zgadywania przyczyn</span>
-      </div>
-      <div className="stories-grid">
-        <article className="story">
-          <span className="story-icon solar">
-            <Sun size={20} />
-          </span>
-          <span className="story-kicker">SŁONECZNE MAKSIMUM</span>
-          <h3>
-            {solarPeak
-              ? numberLabel((solarPeak.generation.solar ?? 0) / 1000, 2) + " GW ze słońca"
-              : "Czekamy na pomiary"}
-          </h3>
-          <p>
-            {solarPeak
-              ? "Najwyższa średnia moc PV. " +
-                generationIntervalLabel(solarPeak) +
-                ". To maksimum w dostępnych pomiarach tego dnia."
-              : "Nie ma jeszcze danych, z których można wyznaczyć maksimum."}
-          </p>
-        </article>
-        <article className="story">
-          <span className="story-icon green">
-            <Leaf size={20} />
-          </span>
-          <span className="story-kicker">UDZIAŁ ODNAWIALNYCH</span>
-          <h3>
-            {share === null
-              ? "Niepełny obraz dnia"
-              : numberLabel(share, 1) + "% produkcji publicznej z OZE"}
-          </h3>
-          <p>
-            Szacunek ważony energią z przedziałów o pełnych danych. Dzisiejsze dane mogą być
-            niepełne i podlegać korektom.
-          </p>
-        </article>
-        <article className="story">
-          <span className="story-icon rose">
-            <Zap size={20} />
-          </span>
-          <span className="story-kicker">MINIMUM RYNKOWE</span>
-          <h3>{cheapest ? numberLabel(cheapest.rcePlnMwh, 2) + " zł/MWh" : "Czekamy na ceny"}</h3>
-          <p>
-            {cheapest
-              ? "Najniższe opublikowane RCE o " +
-                timeLabel(cheapest.start) +
-                ". Wpływ na rachunek zależy od Twojej umowy."
-              : "Najniższa cena pojawi się po publikacji danych PSE."}
-          </p>
-        </article>
-      </div>
     </section>
   );
 }
@@ -287,7 +213,7 @@ export function App() {
   const point = data?.points[selected];
   const latestPoint = latest === null ? undefined : data?.points[latest];
   const status = observationState(latestPoint, date, now);
-  const selectInterval = (index: number) => setSelection({ date, index });
+  const selectInterval = useCallback((index: number) => setSelection({ date, index }), [date]);
   function changeDate(value: string) {
     if (!value || value < "2024-06-14" || value > today()) return;
     selectDate(value);
@@ -503,7 +429,7 @@ export function App() {
               <FlowMap point={point} onEvidence={() => evidence("flows")} />
             </div>
             <Guidance point={point} />
-            <Stories day={data} now={now} />
+            <DailySummary key={data.date} day={data} now={now} onSelect={selectInterval} />
             <div className="secondary-grid">
               <PriceChart
                 day={data}

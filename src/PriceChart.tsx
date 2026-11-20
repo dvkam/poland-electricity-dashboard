@@ -26,7 +26,9 @@ export function PriceChart({
       <div className="panel-heading">
         <div>
           <span className="eyebrow">CENA RYNKOWA · PLN/MWh</span>
-          <h2 id="price-heading">Ile kosztuje energia na rynku?</h2>
+          <h2 id="price-heading" tabIndex={-1}>
+            Ile kosztuje energia na rynku?
+          </h2>
         </div>
         <button
           type="button"

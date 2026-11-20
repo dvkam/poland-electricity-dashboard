@@ -1,0 +1,53 @@
+.stories-section .stories-grid {
+  margin-bottom: 10px;
+}
+.summary-coverage {
+  margin-bottom: 24px;
+  border-bottom: 1px solid #dce2e8;
+}
+.summary-coverage summary,
+.summary-intervals summary {
+  cursor: pointer;
+  padding-block: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.coverage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  gap: 16px;
+  padding: 8px 0 16px;
+}
+.coverage-feed h3,
+.coverage-feed p,
+.coverage-feed ul {
+  margin: 0 0 4px;
+}
+.coverage-feed h3 {
+  font-size: 14px;
+}
+.coverage-feed p,
+.coverage-feed li {
+  color: #526477;
+  font-size: 13px;
+}
+.coverage-feed strong {
+  display: block;
+  margin-bottom: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.coverage-feed ul,
+.summary-intervals ul {
+  max-height: 12rem;
+  overflow: auto;
+  padding-inline-start: 18px;
+}
+.summary-intervals ul {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+}
+.story .text-link {
+  min-height: 36px;
+  text-align: left;
+}

@@ -27,6 +27,16 @@ test("renders the published storage interval and PSE readings", async ({ page })
   await expect(page.locator(".flow-summary")).toContainText("eksport netto");
   await expect(page.locator(".guidance")).toContainText("Zwykłe korzystanie");
   await expect(page.locator(".interval-label")).toContainText("20:00–20:15");
+  const summaries = page.locator(".stories-grid");
+  await expect(summaries.locator("h3")).toHaveText([
+    "0,00 GW ze słońca",
+    "41,8% z OZE",
+    "523,01 zł/MWh",
+  ]);
+  for (const card of await summaries.getByRole("article").all()) {
+    await expect(card).toContainText("0,25 z 25 godz.");
+    await expect(card.getByRole("button", { name: "20:00–20:15 (UTC+1)" })).toBeVisible();
+  }
   await page.getByText("Tabela przepływów na granicach").click();
   const table = page.getByRole("table", { name: /Saldo dla Polski/ });
   await expect(table.getByRole("row", { name: /Niemcy/ })).toHaveText(/Niemcy\+1866,5Import/);

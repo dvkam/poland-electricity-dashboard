@@ -168,17 +168,21 @@ export function observationState(point: Point | undefined, date: string, now = D
   return "Ostatni pomiar";
 }
 
+export function renewableEnergyWeight(point: Point): number {
+  const storage = point.generation.storage;
+  if (point.generationMw === null || point.renewablePercent === null || storage === null) return 0;
+  const hours = (Date.parse(point.end) - Date.parse(point.start)) / 3_600_000;
+  return Math.max(0, point.generationMw - storage) * hours;
+}
+
 export function renewableEnergyShare(points: readonly Point[]): number | null {
   let renewable = 0;
   let total = 0;
   for (const point of points) {
-    if (point.generationMw === null || point.renewablePercent === null) continue;
-    const storage = point.generation.storage;
-    if (storage === null || point.generationMw <= storage) continue;
-    const generation = point.generationMw - storage;
-    const hours = (Date.parse(point.end) - Date.parse(point.start)) / 3_600_000;
-    total += generation * hours;
-    renewable += ((generation * point.renewablePercent) / 100) * hours;
+    const energy = renewableEnergyWeight(point);
+    if (point.renewablePercent === null || energy <= 0) continue;
+    total += energy;
+    renewable += (energy * point.renewablePercent) / 100;
   }
   return total > 0 ? (renewable / total) * 100 : null;
 }
