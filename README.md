@@ -141,6 +141,8 @@ Browser tests use installed Microsoft Edge by default. On Linux, install Chromiu
 
 ## Current limits
 
+The [20 November review](docs/review-2026-11-20.md) lists the dates checked against provider readings, local response times and proposed changes in priority order.
+
 - Source coverage and publication delays vary. Historical PSE coverage is separate from Energy-Charts coverage.
 - The file store supports one service process. It has no cross-process locking or automatic retention.
 - Bulk backfills need request throttling and HTTP 429 retry handling before production use.
