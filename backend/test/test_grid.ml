@@ -99,8 +99,8 @@ let () =
     check message (try action (); false with Store.Source_error _ -> true) in
   fails "HTTP error is distinct from empty publication" (fun () -> ignore (Store.decode_response 503 "unavailable"));
   fails "invalid JSON is rejected" (fun () -> ignore (Store.decode_response 200 "<html>"));
-  fails "empty publication is diagnosed" (fun () -> Store.validate "generation" (`Assoc ["unix_seconds", `List []]));
-  fails "missing response field is diagnosed" (fun () -> Store.validate "generation" (`Assoc []));
+  fails "empty publication is diagnosed" (fun () -> Store.validate ~date:"2026-10-25" "generation" (`Assoc ["unix_seconds", `List []]));
+  fails "missing response field is diagnosed" (fun () -> Store.validate ~date:"2026-10-25" "generation" (`Assoc []));
   check "cache write failure returns a warning instead of discarding fresh data"
     (Option.is_some (Store.persist (fun _ _ -> failwith "disk full") `Null 0.));
   let series name value = `Assoc ["name", `String name; "data", `List [value]] in
@@ -160,3 +160,25 @@ let () =
       let archived = Sys.readdir dir |> Array.to_list |> List.filter (fun f -> f <> "generation.json") in
       check "same-time revisions keep both immutable snapshots" (List.length archived = 2);
       check "cache points to latest revision" (Store.read path = Some (`Int 2, 123.)))
+
+let () =
+  let date = "2026-10-25" in
+  let row = ["business_date", `String date; "dtime_utc", `String "2026-10-25 19:15";
+    "publication_ts_utc", `String "2026-10-24 12:00:00"; "rce_pln", `Float 523.01] in
+  let envelope fields = `Assoc ["value", `List [`Assoc fields]] in
+  let valid = envelope row in
+  Store.validate ~date "prices" (envelope (("rce_pln", `Null) :: List.remove_assoc "rce_pln" row));
+  let dir = Filename.temp_file "pse-cache" "" in
+  Sys.remove dir; Unix.mkdir dir 0o700;
+  Fun.protect ~finally:(fun () -> Array.iter (fun f -> Sys.remove (Filename.concat dir f)) (Sys.readdir dir); Unix.rmdir dir)
+    (fun () ->
+      let path = Filename.concat dir ("prices-" ^ date ^ ".json") in
+      Store.save path valid 1.;
+      List.iter (fun bad ->
+        let fetch url = Lwt.return (if url = "first" then
+          `Assoc ["value", `List [`Assoc row]; "nextLink", `String "https://api.raporty.pse.pl/api/next"] else bad) in
+        let result = Lwt_main.run (Store.get_with ~directory:dir ~fetch ~date ~id:"prices" ~url:"first") in
+        check "bad continuation keeps good cached price and snapshot" (result.cached && Option.is_some result.error
+          && result.payload = valid && Store.read path = Some (valid, 1.) && Array.length (Sys.readdir dir) = 2)
+      ) [envelope (List.remove_assoc "rce_pln" row); `Assoc [];
+         envelope (("business_date", `String "2026-10-26") :: List.remove_assoc "business_date" row)])

@@ -15,7 +15,29 @@ let decode_response status body =
   try Yojson.Safe.from_string body with _ ->
     raise (Source_error "Źródło zwróciło nieprawidłowy JSON.")
 
-let validate id payload =
+let valid_pse_row ~date id row =
+  let open Normalize in
+  let nullable key valid = match row with
+    | `Assoc fields -> (match List.assoc_opt key fields with
+      | Some `Null -> true | Some value -> valid value | None -> false)
+    | _ -> false in
+  let numeric key = nullable key (fun value -> Option.is_some (number value)) in
+  let valid_period = match timestamp "dtime_utc" row with
+    | None -> false
+    | Some t when id = "guidance" -> Time.today t = date && mod_float t 3600. = 0.
+    | Some t -> Time.today (t -. 1.) = date && mod_float t 900. = 0. in
+  field "business_date" row = `String date && valid_period
+  && Option.is_some (timestamp "publication_ts_utc" row)
+  && (match id with
+    | "prices" -> numeric "rce_pln"
+    | "flows" -> numeric "value" && (match string (field "section_code" row) with
+        | Some code -> String.length code > 0 | None -> false)
+    | "guidance" -> field "is_active" row = `Bool true &&
+        nullable "usage_fcst" (fun v -> match number v with
+          | Some n -> Float.floor n = n && n >= 0. && n <= 3. | None -> false)
+    | _ -> false)
+
+let validate ~date id payload =
   let payload = if id = "generation" then
     (try Normalize.public_power_v2 payload with Invalid_argument _ ->
       raise (Source_error "Nieobsługiwany format, jednostka lub okres danych produkcji."))
@@ -23,7 +45,9 @@ let validate id payload =
   let key = if id = "generation" then "unix_seconds" else "value" in
   match Normalize.field key payload with
   | `List [] -> raise (Source_error "Źródło nie opublikowało jeszcze danych dla tego dnia.")
-  | `List _ when id <> "generation" -> ()
+  | `List rows when id <> "generation" ->
+      if not (List.for_all (valid_pse_row ~date id) rows) then
+        raise (Source_error "Raport PSE zawiera nieprawidłowy wiersz lub datę.")
   | `List _ -> (match Normalize.field "production_types" payload with
       | `List (_ :: _) -> ()
       | _ -> raise (Source_error "Odpowiedź źródła nie zawiera serii produkcji."))
@@ -49,14 +73,15 @@ let request url =
         prerr_endline ("Source transport failed: " ^ url ^ " " ^ stderr);
         Lwt.fail (Source_error "Nie udało się połączyć ze źródłem (sieć lub limit czasu)."))
 
-let rec paginated ?(remaining=20) url =
-  request url >>= fun payload ->
-  match Normalize.string (Normalize.field "nextLink" payload) with
-  | Some next when remaining > 0 && String.starts_with ~prefix:"https://api.raporty.pse.pl/api/" next ->
-      paginated ~remaining:(remaining - 1) next >|= fun rest ->
+let rec paginated ~fetch ~date ~id ?(remaining=20) url =
+  fetch url >>= fun payload ->
+  validate ~date id payload;
+  match Normalize.field "nextLink" payload with
+  | `String next when remaining > 0 && String.starts_with ~prefix:"https://api.raporty.pse.pl/api/" next ->
+      paginated ~fetch ~date ~id ~remaining:(remaining - 1) next >|= fun rest ->
       `Assoc ["value", `List (Normalize.list (Normalize.field "value" payload) @ Normalize.list (Normalize.field "value" rest))]
-  | Some _ -> Lwt.fail_with "Niepełna odpowiedź źródła"
-  | None -> Lwt.return payload
+  | `Null -> Lwt.return payload
+  | _ -> Lwt.fail_with "Niepełna odpowiedź źródła"
 
 let read path =
   try
@@ -87,11 +112,12 @@ let cache_ttl ~date ~now =
     | None -> assert false in
   if date = today || date = yesterday then 300. else 21600.
 
-let get ~date ~id ~url =
+let get_with ~directory ~fetch ~date ~id ~url =
   let key = (if id = "generation" then "generation-v2" else id) ^ "-" ^ date in
   Lwt_mutex.with_lock (lock key) (fun () ->
     let path = Filename.concat directory (key ^ ".json") in
-    let previous = read path in
+    let previous = Option.bind (read path) (fun (payload, t) ->
+      try validate ~date id payload; Some (payload, t) with Source_error _ -> None) in
     let now = Unix.gettimeofday () in
     let ttl = cache_ttl ~date ~now in
     match previous with
@@ -99,8 +125,7 @@ let get ~date ~id ~url =
         Lwt.return {payload; fetched_at=Some fetched; cached=true; error=None; url; id}
     | _ ->
         Lwt.catch
-          (fun () -> paginated url >|= fun payload ->
-            validate id payload;
+          (fun () -> paginated ~fetch ~date ~id url >|= fun payload ->
             let fetched_at = Unix.gettimeofday () in
             let error = persist (save path) payload fetched_at in
             {payload; fetched_at=Some fetched_at; cached=false; error; url; id})
@@ -112,6 +137,8 @@ let get ~date ~id ~url =
             Lwt.return {payload; fetched_at=fetched; cached=Option.is_some fetched;
               error=Some (reason ^ (if Option.is_some fetched then " Pokazujemy ostatni dostępny zapis." else ""));
               url; id}))
+
+let get = get_with ~directory ~fetch:request
 
 let source_json resource =
   let name, note, home = match resource.id with
