@@ -2,6 +2,40 @@
 
 ## 20 November 2026
 
+### Source accuracy and warm response times
+
+With the new generation validator, refresh handling and day cache, the local OCaml tests, all 14 frontend unit tests, all 21 Edge browser tests and the production build passed. The browser replay checks the headline cards, daily coverage, hours, table and downloaded CSV against an archived quarter. Separate tests cover concurrent refresh, cancellation, recovery, cache eviction, wrong-country responses and both Warsaw clock changes.
+
+An independent Python check compared the API with the saved Energy-Charts and PSE responses. Each quarter contributed 54 checks covering source intervals, fuel groups, generation, demand, pumping, renewable share, RCE, guidance, individual and combined border flows, and border publication times.
+
+| Warsaw date      | Source resolution for generation | Quarters | Checks passed |
+| ---------------- | -------------------------------- | -------: | ------------: |
+| 14 June 2024     | Hourly                           |       96 |         5,184 |
+| 25 October 2026  | Quarter-hourly                   |      100 |         5,400 |
+| 17 November 2026 | Quarter-hourly                   |       96 |         5,184 |
+
+A second run started with an empty data directory and downloaded all four feeds again for 17 November. All 5,184 comparisons passed. To check the repository fixture on Linux after building the replay executable, run these commands from the repository root.
+
+```sh
+backend/_build/default/test/replay_day.exe 2026-10-25 tests/source-records > /tmp/dashboard-day.json
+python3 tests/verify_source.py /tmp/dashboard-day.json tests/source-records
+```
+
+For a historical day fetched locally, pass the saved HTTP response and the matching `DATA_DIR` to the same script. A source revision between retrieval and comparison can change the result.
+
+The HTTP benchmark ran in WSL over loopback for 17 November. Each process read the same four provider payloads from a temporary directory, with fresh retrieval times. After one warm-up request, the client timed the complete response body and checked every points array against the warm-up response. Five alternating pairs of 20 sequential requests gave 100 measurements per build. Host load varied between batches.
+
+| Warm day endpoint                              | Median | 95th percentile |
+| ---------------------------------------------- | -----: | --------------: |
+| Before, `c36924f`                              | 547 ms |        2,484 ms |
+| With PSE indexing and assembled response reuse | 1.7 ms |         14.6 ms |
+
+A separate 100-request run on the reviewed implementation measured a 1.5 ms median and a 2.7 ms 95th percentile. Every measured request succeeded. Public-network and cold-download times depend on the network and upstream publication.
+
+In the local production browser build, navigation to visible cards took 454 ms at 1440 pixels and 356 ms at 390 pixels. The earlier review measured 1,013 and 936 ms respectively. Each figure comes from one navigation on desktop Edge at that viewport width. The added publication metadata increased the 100-quarter response from 153,185 to 212,995 bytes, or 16,155 to 16,851 bytes when compressed with gzip locally.
+
+### Earlier baseline
+
 At revision `abb4456`, the local frontend checks, OCaml regressions and 16 browser tests passed. GitHub ran the frontend checks, backend build and tests, and the numerical browser replay on Linux. Both jobs [completed successfully](https://github.com/dvkam/poland-electricity-dashboard/actions/runs/44651887027).
 
 The replay covers 25 October 2026, 20:00 to 20:15 in Warsaw, starting at 19:00 UTC. The archived source responses produce 18.40 GW public net generation, 18.22 GW demand, 41.8% renewable generation, 523.01 PLN/MWh RCE, 0.15 GW net export and ordinary-use guidance. The test checks the text in the browser. It exercises one interval with complete source coverage. Historical coverage, missing data and publication revisions have separate regression cases.

@@ -12,7 +12,9 @@ The React frontend reads a local OCaml API. The API fetches public data from Ene
 - Browse dates from 14 June 2024, subject to each source's coverage.
 - Compare generation, demand, renewable share, prices and border flows.
 - See source timestamps, delayed readings and fetch errors.
-- Export the selected day as CSV.
+- See how many hours contribute to each daily figure and open the measurements behind it.
+- Inspect signed imports and exports for each border in the map's expandable table.
+- Export all quarters as CSV, including nine fuel groups, both directions on each border, source intervals, revision timestamps and retrieval status. A blank numeric cell means the source reading is unavailable.
 
 Older generation data can contain hourly averages. The dashboard labels the original hour and displays its average across the four covered quarters. It does not invent measurements within that hour. Missing observations stay empty. Warsaw daylight-saving days contain 92 or 100 quarters instead of 96.
 
@@ -37,7 +39,7 @@ Both applications live in this repository so a commit can update the API and its
 
 ## Run locally
 
-You need Node.js 24 or newer, npm, opam and curl. Run the backend on Linux, macOS or Windows WSL. On Debian or Ubuntu, install `build-essential`, `pkg-config`, `libgmp-dev` and `libev-dev` before installing the OCaml dependencies.
+You need Node.js 24 or newer, npm, opam and curl 7.84 or newer. Run the backend on Linux, macOS or Windows WSL. On Debian or Ubuntu, install `build-essential`, `pkg-config`, `libgmp-dev` and `libev-dev` before installing the OCaml dependencies.
 
 Start the backend in one terminal:
 
@@ -96,7 +98,7 @@ Open http://127.0.0.1:8088. Nginx serves the frontend and forwards API requests 
 
 Energy-Charts provides public net production based on ENTSO-E data. Generation totals exclude load, trade and storage consumption. Total generation includes storage discharge. The interval renewable share comes from Energy-Charts. The daily estimate weights the published, rounded percentages by generation energy excluding storage discharge. The historical source inventory can omit offshore wind and batteries; explicit null readings remain unknown.
 
-PSE flow values describe physical exchange. The backend combines both directions for each border. The national net requires complete coverage of all six borders. These flows do not identify the origin of electricity consumed in a home.
+PSE flow values describe physical exchange. The six-border net requires both directional readings for each displayed border. Positive values indicate net imports into Poland. Negative values indicate net exports.
 
 Energy-Charts timestamps identify interval starts. PSE price and flow timestamps identify interval ends. The backend preserves UTC boundaries and the UI displays Warsaw time. PSE guidance is hourly and uses only active publications.
 
@@ -107,6 +109,10 @@ The interval renewable percentage comes directly from Energy-Charts. A missing p
 PSE price and flow rows must match the requested Warsaw day and quarter. Each page must pass validation before a new response replaces the cache. Flow reports can contain historical auxiliary sections. The national figure currently sums the six displayed country pairs and requires both directions on each pair. A failed fetch can reuse a previous response for that date. If a download succeeds but the snapshot write fails, the dashboard shows the fresh readings with a storage warning.
 
 ## History and snapshots
+
+Before saving generation data, the backend checks the requested Warsaw day, country, endpoint, units and declared interval. It accepts partial days and explicit null measurements. Duplicate times, misaligned intervals and malformed values trigger same-day fallback when a valid snapshot exists.
+
+The backend keeps up to 16 assembled day responses in memory. Each entry expires with its earliest source or when a source file changes. Requests for the same source and date share one refresh with a 40-second deadline across all pages. A visitor with an older valid snapshot sees it immediately. While the source is updating, the dashboard checks again after five seconds. Failed downloads have a short retry delay and HTTP 429 or 503 responses can specify a later retry time.
 
 Historical data is requested from the upstream APIs on demand. A database is not required to browse it. Today and yesterday refresh after five minutes; older dates use a six-hour cache. Background ingestion refreshes today.
 
@@ -145,7 +151,7 @@ The [20 November review](docs/review-2026-11-20.md) lists the dates checked agai
 
 - Source coverage and publication delays vary. Historical PSE coverage is separate from Energy-Charts coverage.
 - The file store supports one service process. It has no cross-process locking or automatic retention.
-- Bulk backfills need request throttling and HTTP 429 retry handling before production use.
+- Bulk backfills would also need a rate limit shared across dates.
 - There is no carbon-intensity model, forecast, tariff optimizer, account system or device control.
 - Public deployment needs a host for the OCaml process, HTTPS and persistent storage.
 
