@@ -142,15 +142,21 @@ let () =
     check ("hourly source covers DST day " ^ date)
       (List.for_all (fun p -> get "generationMw" p = `Float 1500.) points)
   ) ["2026-03-29"; "2026-10-25"];
-  let inventory ids =
-    let raw = source 15 [start +. 86400.] in
+  let inventory ?(date="2024-06-15") ids =
+    let raw = source 15 [Option.get (Time.bounds date) |> fst] in
     let raw = `Assoc (("series", `List (List.map (fun id -> `Assoc ["id", `String id]) ids)) ::
       (match raw with `Assoc fields -> List.remove_assoc "series" fields | _ -> assert false)) in
-    let points = Normalize.day ~date:"2024-06-15" ~power:(Normalize.public_power_v2 raw) ~flows:empty ~prices:empty ~guidance:empty in
-    get "generationMw" (List.hd points) in
+    let points = Normalize.day ~date ~power:(Normalize.public_power_v2 raw) ~flows:empty ~prices:empty ~guidance:empty in
+    List.hd points in
   let ids = List.map fst Normalize.production_ids in
-  check "unclassified series blocks fuel total" (inventory ("new_fuel" :: ids) = `Null);
-  check "missing offshore series blocks unverified total" (inventory (List.filter ((<>) "wind_offshore") ids) = `Null);
+  check "unclassified series blocks fuel total" (get "generationMw" (inventory ("new_fuel" :: ids)) = `Null);
+  check "missing offshore series blocks unverified total" (get "generationMw" (inventory (List.filter ((<>) "wind_offshore") ids)) = `Null);
+  let without_battery = List.filter ((<>) "battery") ids in
+  check "missing battery hides partial storage figure"
+    (get "storage" (get "generation" (inventory without_battery)) = `Null);
+  let old_ids = List.filter ((<>) "wind_offshore") without_battery in
+  check "verified historical inventory totals only reported fuels"
+    (get "generationMw" (inventory ~date:"2024-06-14" old_ids) = `Float 1300.);
   let dir = Filename.temp_file "grid-snapshot-test" "" in
   Sys.remove dir; Unix.mkdir dir 0o700;
   Fun.protect ~finally:(fun () -> Array.iter (fun f -> Sys.remove (Filename.concat dir f)) (Sys.readdir dir); Unix.rmdir dir)
