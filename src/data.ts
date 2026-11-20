@@ -137,18 +137,20 @@ export const dateLabel = (date: string) =>
     timeZone: "Europe/Warsaw",
   }).format(new Date(date + "T12:00:00Z"));
 
+export function completedGeneration(point: Point, now: number): boolean {
+  return point.generationMw !== null && Date.parse(point.generationEnd ?? point.end) <= now;
+}
+
 export function latestIndex(points: readonly Point[], now = Date.now()): number | null {
   let index: number | null = null;
   points.forEach((point, i) => {
-    if (point.generationMw !== null && Date.parse(point.generationEnd ?? point.end) <= now)
-      index = i;
+    if (completedGeneration(point, now)) index = i;
   });
   return index;
 }
 
 export function observationState(point: Point | undefined, date: string, now = Date.now()): string {
-  if (!point || point.generationMw === null || Date.parse(point.generationEnd ?? point.end) > now)
-    return "Brak pomiaru";
+  if (!point || !completedGeneration(point, now)) return "Brak pomiaru";
   if (date !== today(now)) return "Dane historyczne";
   const age = now - Date.parse(point.generationEnd ?? point.end);
   if (age > 3_600_000) return "Dane opóźnione";

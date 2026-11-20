@@ -27,6 +27,7 @@ import {
   fullTime,
   intervalLabel,
   generationIntervalLabel,
+  completedGeneration,
   fuels,
   latestIndex,
   numberLabel,
@@ -84,10 +85,12 @@ function Stat({
   icon,
   accent,
   onClick,
+  period,
 }: {
   title: string;
   value: string;
   unit: string;
+  period?: string | undefined;
   detail: string;
   icon: React.ReactNode;
   accent?: boolean;
@@ -107,6 +110,7 @@ function Stat({
         {value}
         <small>{unit}</small>
       </span>
+      {period && <span className="stat-detail">{period}</span>}
       <span className="stat-detail">
         {detail}
         <ArrowUpRight size={14} />
@@ -119,10 +123,10 @@ function Mix({ point }: { point: Point | undefined }) {
     <section className="panel mix-panel">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">WYBRANY KWADRANS</span>
+          <span className="eyebrow">DANE O PRODUKCJI</span>
           <h2>Produkcja w szczegółach</h2>
         </div>
-        <span className="small-tag">{point ? timeLabel(point.start) : "—"}</span>
+        <span className="small-tag">{point ? generationIntervalLabel(point) : "—"}</span>
       </div>
       <div className="mix-list">
         {fuels.map((fuel) => {
@@ -153,10 +157,8 @@ function Mix({ point }: { point: Point | undefined }) {
     </section>
   );
 }
-function Stories({ day }: { day: Day }) {
-  const complete = day.points.filter(
-    (point) => point.generationMw !== null && Date.parse(point.end) <= Date.parse(day.generatedAt),
-  );
+function Stories({ day, now }: { day: Day; now: number }) {
+  const complete = day.points.filter((point) => completedGeneration(point, now));
   const solarPeak = complete.reduce<Point | undefined>(
     (best, point) =>
       (point.generation.solar ?? -1) > (best?.generation.solar ?? -1) ? point : best,
@@ -187,8 +189,8 @@ function Stories({ day }: { day: Day }) {
           </h3>
           <p>
             {solarPeak
-              ? "Najwyższa raportowana moc PV o " +
-                timeLabel(solarPeak.start) +
+              ? "Najwyższa średnia moc PV. " +
+                generationIntervalLabel(solarPeak) +
                 ". To maksimum w dostępnych pomiarach tego dnia."
               : "Nie ma jeszcze danych, z których można wyznaczyć maksimum."}
           </p>
@@ -202,8 +204,8 @@ function Stories({ day }: { day: Day }) {
             {share === null ? "Niepełny obraz dnia" : numberLabel(share, 1) + "% produkcji z OZE"}
           </h3>
           <p>
-            Udział ważony energią z {complete.length} dostępnych kwadransów. Dzisiejsze dane mogą
-            być niepełne i podlegać korektom.
+            Szacunek ważony energią z przedziałów o pełnych danych. Dzisiejsze dane mogą być
+            niepełne i podlegać korektom.
           </p>
         </article>
         <article className="story">
@@ -490,6 +492,7 @@ export function App() {
                 unit="GW"
                 detail="Moc pobierana z systemu"
                 icon={<Activity size={19} />}
+                period={point ? generationIntervalLabel(point) : undefined}
                 onClick={() => evidence("generation")}
               />
               <Stat
@@ -501,8 +504,13 @@ export function App() {
                   2,
                 )}
                 unit="GW"
-                detail={point?.generationMw == null ? "Brak pełnych danych o produkcji" : "Suma raportowanych źródeł"}
+                detail={
+                  point?.generationMw == null
+                    ? "Brak pełnych danych o produkcji"
+                    : "Suma raportowanych źródeł"
+                }
                 icon={<Zap size={19} />}
+                period={point ? generationIntervalLabel(point) : undefined}
                 onClick={() => evidence("generation")}
               />
               <Stat
@@ -512,6 +520,7 @@ export function App() {
                 detail="W krajowej produkcji"
                 icon={<Leaf size={19} />}
                 accent
+                period={point ? generationIntervalLabel(point) : undefined}
                 onClick={() => evidence("generation")}
               />
               <Stat
@@ -528,7 +537,7 @@ export function App() {
               <FlowMap point={point} onEvidence={() => evidence("flows")} />
             </div>
             <Guidance point={point} />
-            <Stories day={data} />
+            <Stories day={data} now={now} />
             <div className="secondary-grid">
               <PriceChart
                 day={data}

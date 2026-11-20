@@ -142,6 +142,8 @@ test("hourly generation keeps its original interval when selecting a quarter", a
   await expect(page.locator(".interval-label")).toHaveText(
     "Średnia godzinowa · 12:00–13:00 (UTC+1)",
   );
+  await expect(page.locator(".mix-panel")).toContainText("Średnia godzinowa · 12:00–13:00");
+  await expect(page.locator(".stat").first()).toContainText("Średnia godzinowa · 12:00–13:00");
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
