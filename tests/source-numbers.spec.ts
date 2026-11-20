@@ -16,6 +16,8 @@ test("renders the published storage interval and PSE readings", async ({ page })
     route.fulfill({ contentType: "application/json", body }),
   );
   await page.goto("/");
+  await expect(page.locator(".stats-grid")).toContainText("Raportowana produkcja netto");
+  await expect(page.locator(".stats-grid")).toContainText("Produkcja publiczna · Energy-Charts");
   const values = page.locator(".stat-value");
   await expect(values).toHaveText(["18,22GW", "18,40GW", "41,8%", "523,01zł/MWh"]);
   await expect(page.locator(".flow-summary")).toContainText("0,15");

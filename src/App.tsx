@@ -201,7 +201,7 @@ function Stories({ day, now }: { day: Day; now: number }) {
           </span>
           <span className="story-kicker">UDZIAŁ ODNAWIALNYCH</span>
           <h3>
-            {share === null ? "Niepełny obraz dnia" : numberLabel(share, 1) + "% produkcji z OZE"}
+            {share === null ? "Niepełny obraz dnia" : numberLabel(share, 1) + "% produkcji publicznej z OZE"}
           </h3>
           <p>
             Szacunek ważony energią z przedziałów o pełnych danych. Dzisiejsze dane mogą być
@@ -496,7 +496,7 @@ export function App() {
                 onClick={() => evidence("generation")}
               />
               <Stat
-                title="Krajowa produkcja"
+                title="Raportowana produkcja netto"
                 value={numberLabel(
                   point?.generationMw === null || point?.generationMw === undefined
                     ? null
@@ -507,7 +507,7 @@ export function App() {
                 detail={
                   point?.generationMw == null
                     ? "Brak pełnych danych o produkcji"
-                    : "Suma raportowanych źródeł"
+                    : "Produkcja publiczna · Energy-Charts"
                 }
                 icon={<Zap size={19} />}
                 period={point ? generationIntervalLabel(point) : undefined}
@@ -517,7 +517,7 @@ export function App() {
                 title="Udział OZE"
                 value={numberLabel(point?.renewablePercent ?? null, 1)}
                 unit="%"
-                detail="W krajowej produkcji"
+                detail="W produkcji publicznej · Energy-Charts"
                 icon={<Leaf size={19} />}
                 accent
                 period={point ? generationIntervalLabel(point) : undefined}
