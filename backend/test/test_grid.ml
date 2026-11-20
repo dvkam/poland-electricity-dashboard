@@ -4,6 +4,16 @@ let get name = Normalize.field name
 let num = Normalize.number
 let empty = `Assoc ["value", `List []]
 let () =
+  let path = Filename.temp_file "grid-directory" "" in
+  Fun.protect ~finally:(fun () -> Sys.remove path) (fun () ->
+    check "a file cannot serve as the data directory"
+      (try Store.ensure_directory path; false with Unix.Unix_error (Unix.EEXIST, _, _) -> true));
+  Fun.protect ~finally:(fun () -> Unix.rmdir path) (fun () ->
+    Store.ensure_directory path;
+    Store.ensure_directory path;
+    check "repeated directory creation succeeds" (Sys.is_directory path))
+
+let () =
   check "normal Warsaw day has 96 quarter-hours" (List.length (Time.slots "2026-09-14") = 96);
   check "spring DST has 92 quarter-hours" (List.length (Time.slots "2026-03-29") = 92);
   check "autumn DST has 100 quarter-hours" (List.length (Time.slots "2026-10-25") = 100);

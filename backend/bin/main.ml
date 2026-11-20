@@ -31,6 +31,7 @@ let callback _ request _body =
   | _ -> json ~status:`Not_found (`Assoc ["error", `String "Not found"])
 
 let () =
+  Grid.Store.ensure_directory Grid.Store.directory;
   let port = Option.value ~default:"8080" (Sys.getenv_opt "PORT") |> int_of_string in
   let host = Option.value ~default:"127.0.0.1" (Sys.getenv_opt "HOST") in
   let address = Unix.inet_addr_of_string host in

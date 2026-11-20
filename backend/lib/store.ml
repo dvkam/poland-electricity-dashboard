@@ -3,7 +3,9 @@ open Lwt.Infix
 type resource = { payload : Yojson.Safe.t; fetched_at : float option; cached : bool;
   revalidating : bool; error : string option; url : string; id : string }
 let directory = Option.value ~default:"../data" (Sys.getenv_opt "DATA_DIR")
-let () = if not (Sys.file_exists directory) then Unix.mkdir directory 0o750
+let ensure_directory path =
+  try Unix.mkdir path 0o750 with
+  | Unix.Unix_error (Unix.EEXIST, _, _) when Sys.is_directory path -> ()
 exception Source_error of string
 exception Retry_after of int * float
 
