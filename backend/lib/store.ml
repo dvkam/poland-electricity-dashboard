@@ -15,6 +15,18 @@ let decode_response status body =
   try Yojson.Safe.from_string body with _ ->
     raise (Source_error "Źródło zwróciło nieprawidłowy JSON.")
 
+let known_flow_section code =
+  List.exists (fun partner -> code = partner ^ "-PL" || code = "PL-" ^ partner)
+    ("UA_DOB" :: Normalize.border_codes)
+
+let matches_pse_quarter row finish =
+  let clock t = String.sub (Time.iso t) 11 5 in
+  match Normalize.field "period_utc" row with
+  | `String period ->
+      let first = clock (finish -. 900.) and last = clock finish in
+      period = first ^ " - " ^ last || (last = "00:00" && period = first ^ " - 24:00")
+  | _ -> false
+
 let valid_pse_row ~date id row =
   let open Normalize in
   let nullable key valid = match row with
@@ -25,13 +37,13 @@ let valid_pse_row ~date id row =
   let valid_period = match timestamp "dtime_utc" row with
     | None -> false
     | Some t when id = "guidance" -> Time.today t = date && mod_float t 3600. = 0.
-    | Some t -> Time.today (t -. 1.) = date && mod_float t 900. = 0. in
+    | Some t -> Time.today (t -. 1.) = date && mod_float t 900. = 0. && matches_pse_quarter row t in
   field "business_date" row = `String date && valid_period
   && Option.is_some (timestamp "publication_ts_utc" row)
   && (match id with
     | "prices" -> numeric "rce_pln"
     | "flows" -> numeric "value" && (match string (field "section_code" row) with
-        | Some code -> String.length code > 0 | None -> false)
+        | Some code -> known_flow_section code | None -> false)
     | "guidance" -> field "is_active" row = `Bool true &&
         nullable "usage_fcst" (fun v -> match number v with
           | Some n -> Float.floor n = n && n >= 0. && n <= 3. | None -> false)

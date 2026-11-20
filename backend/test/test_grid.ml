@@ -163,7 +163,7 @@ let () =
 
 let () =
   let date = "2026-10-25" in
-  let row = ["business_date", `String date; "dtime_utc", `String "2026-10-25 19:15";
+  let row = ["business_date", `String date; "period_utc", `String "19:00 - 19:15"; "dtime_utc", `String "2026-10-25 19:15";
     "publication_ts_utc", `String "2026-10-24 12:00:00"; "rce_pln", `Float 523.01] in
   let envelope fields = `Assoc ["value", `List [`Assoc fields]] in
   let valid = envelope row in
@@ -181,4 +181,5 @@ let () =
         check "bad continuation keeps good cached price and snapshot" (result.cached && Option.is_some result.error
           && result.payload = valid && Store.read path = Some (valid, 1.) && Array.length (Sys.readdir dir) = 2)
       ) [envelope (List.remove_assoc "rce_pln" row); `Assoc [];
+         envelope (("period_utc", `String "18:15 - 19:15") :: List.remove_assoc "period_utc" row);
          envelope (("business_date", `String "2026-10-26") :: List.remove_assoc "business_date" row)])
