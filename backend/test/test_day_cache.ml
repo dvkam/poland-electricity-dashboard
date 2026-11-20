@@ -29,9 +29,11 @@ let () =
 let () =
   let date = "2026-10-25" in
   let now = Option.get (Time.parse_utc "2026-10-25T12:00:00Z") in
-  let source = Store.{payload=`Null; fetched_at=Some now; cached=true; error=None; url="source"; id="prices"} in
+  let source = Store.{payload=`Null; fetched_at=Some now; cached=true; revalidating=false;
+    error=None; url="source"; id="prices"} in
   let deadline resources = Store.stable_until ~date ~now resources in
   assert (deadline [source; {source with fetched_at=Some (now -. 20.)}] = Some (now +. 280.));
-  assert (deadline [source; {source with error=Some "revalidating"}] = None);
+  assert (deadline [source; {source with revalidating=true}] = None);
+  assert (deadline [source; {source with error=Some "unavailable"}] = None);
   assert (deadline [{source with cached=false}] = None);
   assert (deadline [{source with fetched_at=None}] = None)

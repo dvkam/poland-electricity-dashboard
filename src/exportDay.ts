@@ -47,6 +47,7 @@ export function dayCsv(day: Day): string {
       `${id}_endpoint`,
       `${id}_fetched_at_utc`,
       `${id}_cached`,
+      `${id}_revalidating`,
       `${id}_error`,
     ]),
   ];
@@ -55,7 +56,13 @@ export function dayCsv(day: Day): string {
     resources.get("generation")?.providerGeneratedAt,
     ...sourceIds.flatMap((id) => {
       const source = resources.get(id);
-      return [source?.endpoint, source?.fetchedAt, source?.cached, source?.error];
+      return [
+        source?.endpoint,
+        source?.fetchedAt,
+        source?.cached,
+        source?.revalidating,
+        source?.error,
+      ];
     }),
   ];
   const rows = day.points.map((p) => {

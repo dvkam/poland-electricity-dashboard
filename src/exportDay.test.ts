@@ -4,6 +4,8 @@ import { dayCsv } from "./exportDay";
 
 test("preserves hourly source boundaries, zeroes and one-sided border readings", () => {
   const day = fixtureDay("2026-03-29");
+  day.sources[0]!.cached = true;
+  day.sources[0]!.revalidating = true;
   const point = day.points[0]!;
   point.generationEnd = day.points[3]!.end;
   point.rcePlnMwh = 0;
@@ -40,7 +42,9 @@ test("preserves hourly source boundaries, zeroes and one-sided border readings",
     CZ_export_published_at_utc: "",
     generation_endpoint: "https://example.com/data",
     generation_fetched_at_utc: "2026-10-25T12:00:00Z",
-    generation_cached: "false",
+    generation_cached: "true",
+    generation_revalidating: "true",
+    generation_error: "",
     prices_fetched_at_utc: "",
     prices_cached: "",
   });

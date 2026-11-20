@@ -24,6 +24,7 @@ export const sourceSchema = z.object({
   fetchedAt: timestamp.nullable(),
   providerGeneratedAt: timestamp.nullable().optional(),
   cached: z.boolean(),
+  revalidating: z.boolean().optional(),
   error: z.string().nullable(),
 });
 export const pointSchema = z.object({

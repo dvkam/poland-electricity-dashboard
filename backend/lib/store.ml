@@ -1,6 +1,7 @@
 open Lwt.Infix
 
-type resource = { payload : Yojson.Safe.t; fetched_at : float option; cached : bool; error : string option; url : string; id : string }
+type resource = { payload : Yojson.Safe.t; fetched_at : float option; cached : bool;
+  revalidating : bool; error : string option; url : string; id : string }
 let directory = Option.value ~default:"../data" (Sys.getenv_opt "DATA_DIR")
 let () = if not (Sys.file_exists directory) then Unix.mkdir directory 0o750
 exception Source_error of string
@@ -179,12 +180,12 @@ let get_using state ~directory ~fetch ~date ~id ~url =
   | None ->
     let previous = Option.bind (read path) (fun (payload, t) ->
       try validate ~date id payload; require_displayed_section id payload;
-          Some {payload; fetched_at=Some t; cached=true; error=None; url; id}
+          Some {payload; fetched_at=Some t; cached=true; revalidating=false; error=None; url; id}
       with Source_error _ -> None) in
     let now = state.now () in
     let fallback reason = match previous with
       | Some old -> {old with error=Some (reason ^ " Pokazujemy ostatni dostępny zapis.")}
-      | None -> {payload=`Null; fetched_at=None; cached=false; error=Some reason; url; id} in
+      | None -> {payload=`Null; fetched_at=None; cached=false; revalidating=false; error=Some reason; url; id} in
     state.failures <- List.filter (fun (_, (until, _)) -> until > now) state.failures;
     match previous, List.assoc_opt path state.failures with
     | Some ({fetched_at=Some t; _} as old), _ when now -. t < cache_ttl ~date ~now -> Lwt.return old
@@ -196,7 +197,7 @@ let get_using state ~directory ~fetch ~date ~id ~url =
           require_displayed_section id payload;
           let fetched_at = state.now () in
           let error = persist (save path) payload fetched_at in
-          {payload; fetched_at=Some fetched_at; cached=false; error; url; id})
+          {payload; fetched_at=Some fetched_at; cached=false; revalidating=false; error; url; id})
           (fun exn ->
             let now = state.now () in
             let reason, retry_at = match exn with
@@ -208,7 +209,7 @@ let get_using state ~directory ~fetch ~date ~id ~url =
             prerr_endline ("Source fetch failed: " ^ url ^ " " ^ Printexc.to_string exn);
             state.failures <- List.take 256 ((path, (retry_at, reason)) :: state.failures);
             Lwt.return (fallback reason)) in
-        let stale = Option.map (fun _ -> fallback "Trwa aktualizacja danych.") previous in
+        let stale = Option.map (fun old -> {old with revalidating=true}) previous in
         let flight = {result; stale} in
         Hashtbl.add state.flights path flight;
         Lwt.on_termination result (fun () -> Hashtbl.remove state.flights path);
@@ -240,6 +241,7 @@ let source_json resource =
     "providerGeneratedAt", (if resource.id = "generation"
       then Normalize.publication_time "generated_at" resource.payload else `Null);
     "cached", `Bool resource.cached;
+    "revalidating", `Bool resource.revalidating;
     "error", (match resource.error with Some value -> `String value | None -> `Null)
   ]
 
@@ -269,8 +271,8 @@ let day_requests date =
 let stable_until ~date ~now resources =
   let ttl = cache_ttl ~date ~now in
   List.fold_left (fun expiry resource ->
-    match expiry, resource.cached, resource.error, resource.fetched_at with
-    | Some limit, true, None, Some time -> Some (min limit (time +. ttl))
+    match expiry, resource.cached, resource.revalidating, resource.error, resource.fetched_at with
+    | Some limit, true, false, None, Some time -> Some (min limit (time +. ttl))
     | _ -> None) (Some infinity) resources
 
 let assembled_days = Day_cache.create ~capacity:16

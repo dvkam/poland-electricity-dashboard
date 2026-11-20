@@ -89,13 +89,15 @@ export function Evidence({
               <div>
                 <dt>Sposób dostarczenia</dt>
                 <dd>
-                  {source.fetchedAt === null
-                    ? "Brak danych ze źródła"
-                    : source.cached
-                      ? source.error
-                        ? "Ostatni dostępny zapis"
-                        : "Zapis w pamięci podręcznej"
-                      : "Odpowiedź źródła"}
+                  {source.revalidating
+                    ? "Ostatni zapis · aktualizacja w toku"
+                    : source.fetchedAt === null
+                      ? "Brak danych ze źródła"
+                      : source.cached
+                        ? source.error
+                          ? "Ostatni dostępny zapis"
+                          : "Zapis w pamięci podręcznej"
+                        : "Odpowiedź źródła"}
                 </dd>
               </div>
             </dl>

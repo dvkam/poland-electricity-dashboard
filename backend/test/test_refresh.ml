@@ -51,7 +51,7 @@ let () = with_directory (fun directory ->
   let get fetch = Store.get_using state ~directory ~fetch ~date ~id:"prices" ~url in
   for _ = 1 to 10 do
     let stale = Lwt_main.run (get fetch) in
-    assert (stale.cached && stale.fetched_at = Some 1. && stale.payload = page 7 && stale.error <> None)
+    assert (stale.cached && stale.revalidating && stale.fetched_at = Some 1. && stale.payload = page 7 && stale.error = None)
   done;
   assert (!calls = 1);
   Lwt.wakeup_exn resume (Store.Retry_after (429, !now +. 90.));
