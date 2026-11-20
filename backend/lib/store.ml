@@ -255,14 +255,30 @@ let day_response date resources =
     "points", `List points
   ]
 
-let load_day date =
+let day_requests date =
   let pse report extra = "https://api.raporty.pse.pl/api/" ^ report
     ^ "?$filter=" ^ Uri.pct_encode ("business_date eq '" ^ date ^ "'" ^ extra)
     ^ "&$first=500" in
-  let requests = [
+  [
     ("generation", "https://api.energy-charts.info/v2/public_power?country=pl&start=" ^ date ^ "&end=" ^ date);
     ("flows", pse "przeplywy-mocy" "");
     ("prices", pse "rce-pln" "");
     ("guidance", pse "pdgsz" " and is_active eq true")
-  ] in
-  Lwt_list.map_p (fun (id, url) -> get ~date ~id ~url) requests >|= day_response date
+  ]
+
+let stable_until ~date ~now resources =
+  let ttl = cache_ttl ~date ~now in
+  List.fold_left (fun expiry resource ->
+    match expiry, resource.cached, resource.error, resource.fetched_at with
+    | Some limit, true, None, Some time -> Some (min limit (time +. ttl))
+    | _ -> None) (Some infinity) resources
+
+let assembled_days = Day_cache.create ~capacity:16
+
+let load_day date =
+  let requests = day_requests date in
+  let paths = List.map (fun (id, _) -> cache_path ~directory ~date id) requests in
+  Day_cache.load assembled_days ~date ~paths ~now:Unix.gettimeofday ~assemble:(fun () ->
+    Lwt_list.map_p (fun (id, url) -> get ~date ~id ~url) requests >|= fun resources ->
+    Yojson.Safe.to_string (day_response date resources),
+    stable_until ~date ~now:(Unix.gettimeofday ()) resources)

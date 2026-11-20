@@ -12,3 +12,8 @@
  (name test_refresh)
  (modules test_refresh)
  (libraries grid lwt.unix unix yojson))
+
+(test
+ (name test_day_cache)
+ (modules test_day_cache)
+ (libraries grid unix yojson))

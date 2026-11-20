@@ -1,12 +1,14 @@
 open Lwt.Infix
 
-let json ?(status=`OK) body =
+let json_string ?(status=`OK) body =
   let headers = Cohttp.Header.of_list [
     "content-type", "application/json; charset=utf-8";
     "cache-control", "no-store";
     "x-content-type-options", "nosniff"
   ] in
-  Cohttp_lwt_unix.Server.respond_string ~status ~headers ~body:(Yojson.Safe.to_string body) ()
+  Cohttp_lwt_unix.Server.respond_string ~status ~headers ~body ()
+
+let json ?status body = json_string ?status (Yojson.Safe.to_string body)
 
 let callback _ request _body =
   let uri = Cohttp.Request.uri request in
@@ -22,7 +24,7 @@ let callback _ request _body =
         json ~status:`Bad_request (`Assoc ["error", `String "Wybierz datę od 2024-06-14 do dzisiaj."])
       else
         Lwt.catch
-          (fun () -> Grid.Store.load_day date >>= json)
+          (fun () -> Grid.Store.load_day date >>= json_string)
           (fun error ->
             prerr_endline (Printexc.to_string error);
             json ~status:`Service_unavailable (`Assoc ["error", `String "Dane są chwilowo niedostępne. Spróbuj ponownie."]))
